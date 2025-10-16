@@ -1,6 +1,7 @@
 package constants
 
 import (
+	os "os"
 	"time"
 )
 
@@ -10,5 +11,5 @@ const (
 )
 
 var (
-	JwtSecret = []byte("your-secret-key") // TODO: Load from environment variable
+	JwtSecret = []byte(os.Getenv("JWT_SECRET"))
 )

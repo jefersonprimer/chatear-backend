@@ -24,6 +24,7 @@ func NewUserHandlers(userService *application.UserApplicationService) *UserHandl
 // Register handles POST /register
 func (h *UserHandlers) Register(c *gin.Context) {
 	var req struct {
+		Name     string `json:"name" binding:"required"`
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required,min=8"`
 	}
@@ -33,7 +34,7 @@ func (h *UserHandlers) Register(c *gin.Context) {
 		return
 	}
 
-	authTokens, user, err := h.userService.Register(c.Request.Context(), req.Email, req.Password)
+	authTokens, user, err := h.userService.Register(c.Request.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -96,6 +97,47 @@ func (h *UserHandlers) Logout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// RefreshToken handles POST /refresh-token
+func (h *UserHandlers) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	authTokens, user, err := h.userService.RefreshToken(c.Request.Context(), req.RefreshToken)
+		if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Token refreshed successfully",
+		"access_token":  authTokens.AccessToken,
+		"refresh_token": authTokens.RefreshToken,
+		"user":          user,
+	})
+}
+
+// VerifyEmail handles GET /verify-email
+func (h *UserHandlers) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+		return
+	}
+
+	if err := h.userService.VerifyEmail(c.Request.Context(), token); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully"})
 }
 
 // GetMe handles GET /me

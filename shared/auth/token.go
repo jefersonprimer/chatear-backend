@@ -1,10 +1,14 @@
 package auth
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
 	"github.com/jefersonprimer/chatear-backend/shared/constants"
 )
 
@@ -15,11 +19,12 @@ type Claims struct {
 }
 
 type TokenService struct {
+	refreshTokenRepo domain.RefreshTokenRepository
 }
 
 // NewTokenService creates a new TokenService
-func NewTokenService() *TokenService {
-	return &TokenService{}
+func NewTokenService(refreshTokenRepo domain.RefreshTokenRepository) *TokenService {
+	return &TokenService{refreshTokenRepo: refreshTokenRepo}
 }
 
 // GenerateAccessToken creates a new JWT access token
@@ -64,16 +69,28 @@ func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) 
 
 // GenerateRefreshToken creates a new refresh token (UUID for now, will be stored in DB)
 func (s *TokenService) GenerateRefreshToken() (string, error) {
-	// For now, a simple UUID-like string. This will be stored in the database.
-	// In a real application, you might use a cryptographically secure random string.
-	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Unix()), nil
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes for refresh token: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
 // ValidateRefreshToken validates a refresh token (this will involve DB lookup later)
-func (s *TokenService) ValidateRefreshToken(token string) (bool, error) {
-	// Placeholder for now. This will involve checking against the database.
-	if token == "" {
-		return false, fmt.Errorf("refresh token is empty")
+func (s *TokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*domain.RefreshToken, error) {
+	refreshToken, err := s.refreshTokenRepo.FindByToken(tokenString)
+	if err != nil {
+		return nil, fmt.Errorf("refresh token not found or invalid: %w", err)
 	}
-	return true, nil
+
+	if refreshToken.Revoked {
+		return nil, fmt.Errorf("refresh token has been revoked")
+	}
+
+	if refreshToken.ExpiresAt.Before(time.Now()) {
+		return nil, fmt.Errorf("refresh token has expired")
+	}
+
+	return refreshToken, nil
 }

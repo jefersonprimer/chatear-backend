@@ -1,5 +1,3 @@
-package application
-
 import (
 	"context"
 	"encoding/json"
@@ -8,6 +6,7 @@ import (
 
 	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
 	"github.com/jefersonprimer/chatear-backend/internal/user/infrastructure"
+	"github.com/jefersonprimer/chatear-backend/shared/events"
 	"github.com/jefersonprimer/chatear-backend/shared/util"
 )
 
@@ -43,12 +42,12 @@ func (uc *PasswordRecovery) Execute(ctx context.Context, email string) error {
 		return err
 	}
 
-	emailData := map[string]string{
-		"to":      user.Email,
-		"subject": "Password Reset",
-		"body":    fmt.Sprintf("Click here to reset your password: http://localhost:8080/reset-password?token=%s", token),
+	emailRequest := events.EmailSendRequest{
+		Recipient: user.Email,
+		Subject:   "Password Reset",
+		Body:      fmt.Sprintf("Click here to reset your password: http://localhost:8080/reset-password?token=%s", token),
 	}
-	emailDataBytes, err := json.Marshal(emailData)
+	emailDataBytes, err := json.Marshal(emailRequest)
 	if err != nil {
 		return err
 	}

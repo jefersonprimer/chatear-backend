@@ -163,6 +163,51 @@ func (r *mutationResolver) RecoverAccount(ctx context.Context, input model.Recov
 	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
 }
 
+// VerifyEmail is the resolver for the verifyEmail field.
+func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (bool, error) {
+	err := r.Resolver.UserAppService.VerifyEmail(ctx, input.Token)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// RefreshToken is the resolver for the refreshToken field.
+func (r *mutationResolver) RefreshToken(ctx context.Context, input model.RefreshTokenInput) (*model.AuthResponse, error) {
+	authTokens, user, err := r.Resolver.UserAppService.RefreshToken(ctx, input.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	modelUser := &model.User{
+		ID:              user.ID.String(),
+		Name:            user.Name,
+		Email:           user.Email,
+		CreatedAt:       user.CreatedAt.String(),
+		UpdatedAt:       user.UpdatedAt.String(),
+		IsEmailVerified: user.IsEmailVerified,
+		IsDeleted:       user.IsDeleted,
+	}
+
+	if user.DeletedAt != nil {
+		deletedAtStr := user.DeletedAt.String()
+		modelUser.DeletedAt = &deletedAtStr
+	}
+	if user.AvatarURL != nil {
+		modelUser.AvatarURL = user.AvatarURL
+	}
+	if user.DeletionDueAt != nil {
+		deletionDueAtStr := user.DeletionDueAt.String()
+		modelUser.DeletionDueAt = &deletionDueAtStr
+	}
+	if user.LastLoginAt != nil {
+		lastLoginAtStr := user.LastLoginAt.String()
+		modelUser.LastLoginAt = &lastLoginAtStr
+	}
+
+	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
+}
+
 // Hello is the resolver for the hello field.
 func (r *queryResolver) Hello(ctx context.Context) (string, error) {
 	return "Hello from GraphQL!", nil

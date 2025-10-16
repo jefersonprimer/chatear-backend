@@ -40,7 +40,12 @@ func SetupServer() (*gin.Engine, error) {
 		log.Fatal("REDIS_URL environment variable not set")
 	}
 
-	infra, err := infrastructure.NewInfrastructure(databaseURL, redisURL)
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		log.Fatal("NATS_URL environment variable not set")
+	}
+
+	infra, err := infrastructure.NewInfrastructure(databaseURL, redisURL, natsURL)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +63,7 @@ func SetupServer() (*gin.Engine, error) {
 	eventBus := userInfra.NewNatsEventBus(infra.NatsConn)
 
 	// Initialize shared services
-	tokenService := auth.NewTokenService()
+	tokenService := auth.NewTokenService(refreshTokenRepo)
 
 	// Initialize user application services
 	userAppService := userApp.NewUserApplicationService(
@@ -66,6 +71,9 @@ func SetupServer() (*gin.Engine, error) {
 		refreshTokenRepo,
 		blacklistRepo,
 		eventBus,
+		tokenRepo,
+		emailRepo,
+		tokenService,
 		constants.AccessTokenExpiration,
 		constants.RefreshTokenExpiration,
 	)
@@ -80,11 +88,13 @@ func SetupServer() (*gin.Engine, error) {
 	{
 		publicRoutes.POST("/register", userHandler.Register)
 		publicRoutes.POST("/login", userHandler.Login)
+		publicRoutes.GET("/verify-email", userHandler.VerifyEmail)
+		publicRoutes.POST("/refresh-token", userHandler.RefreshToken)
 	}
 
 	// Authenticated routes
 	authRoutes := r.Group("/api/v1")
-	authRoutes.Use(auth.AuthMiddleware(blacklistRepo))
+	authRoutes.Use(auth.AuthMiddleware(tokenService, blacklistRepo))
 	{
 		authRoutes.GET("/me", userHandler.GetMe)
 		authRoutes.POST("/logout", userHandler.Logout)

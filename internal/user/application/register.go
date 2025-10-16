@@ -1,5 +1,3 @@
-package application
-
 import (
 	"context"
 	"encoding/json"
@@ -10,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
 	"github.com/jefersonprimer/chatear-backend/internal/user/infrastructure"
+	"github.com/jefersonprimer/chatear-backend/shared/events"
 	"github.com/jefersonprimer/chatear-backend/shared/util"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -54,8 +53,7 @@ func (uc *RegisterUser) Execute(ctx context.Context, name, email, password strin
 
 	emails, err := uc.EmailRepository.GetEmailsByUserIDAndType(ctx, user.ID, "verification")
 	if err != nil {
-		return nil, err
-	}
+		return nil, err	}
 
 	if len(emails) >= maxEmailsPerDay {
 		return nil, errors.New("email limit exceeded")
@@ -70,12 +68,12 @@ func (uc *RegisterUser) Execute(ctx context.Context, name, email, password strin
 		return nil, err
 	}
 
-	emailData := map[string]string{
-		"to":      user.Email,
-		"subject": "Email Verification",
-		"body":    fmt.Sprintf("Click here to verify your email: http://localhost:8080/verify-email?token=%s", token),
+	emailRequest := events.EmailSendRequest{
+		Recipient: user.Email,
+		Subject:   "Email Verification",
+		Body:      fmt.Sprintf("Click here to verify your email: http://localhost:8080/verify-email?token=%s", token),
 	}
-	emailDataBytes, err := json.Marshal(emailData)
+	emailDataBytes, err := json.Marshal(emailRequest)
 	if err != nil {
 		return nil, err
 	}

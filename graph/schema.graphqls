@@ -46,6 +46,14 @@ input RecoverAccountInput {
   newPassword: String!
 }
 
+input VerifyEmailInput {
+  token: String!
+}
+
+input RefreshTokenInput {
+  refreshToken: String!
+}
+
 type Query {
   # Placeholder for future queries
   hello: String!
@@ -58,4 +66,6 @@ type Mutation {
   recoverPassword(input: RecoverPasswordInput!): Boolean!
   deleteAccount(input: DeleteAccountInput!): Boolean!
   recoverAccount(input: RecoverAccountInput!): Boolean!
+  verifyEmail(input: VerifyEmailInput!): Boolean!
+  refreshToken(input: RefreshTokenInput!): AuthResponse!
 }

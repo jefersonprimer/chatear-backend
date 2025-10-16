@@ -8,6 +8,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jefersonprimer/chatear-backend/infrastructure/db/postgres"
+	"github.com/nats-io/nats.go"
 )
 
 // DB holds the database connection pool.
@@ -62,14 +63,24 @@ func NewRedisClient(redisURL string) (*redis.Client, error) {
 	return client, nil
 }
 
+// NewNatsClient creates a new NATS client
+func NewNatsClient(natsURL string) (*nats.Conn, error) {
+	conn, err := nats.Connect(natsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to nats: %w", err)
+	}
+	return conn, nil
+}
+
 // Infrastructure holds all infrastructure components
 type Infrastructure struct {
 	Postgres *postgres.Adapter
 	Redis    *redis.Client
+	NatsConn *nats.Conn
 }
 
 // NewInfrastructure creates and initializes all infrastructure components
-func NewInfrastructure(databaseURL, redisURL string) (*Infrastructure, error) {
+func NewInfrastructure(databaseURL, redisURL, natsURL string) (*Infrastructure, error) {
 	pgAdapter, err := NewPostgresAdapter(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create postgres adapter: %w", err)
@@ -80,10 +91,17 @@ func NewInfrastructure(databaseURL, redisURL string) (*Infrastructure, error) {
 		return nil, fmt.Errorf("failed to create redis client: %w", err)
 	}
 
+	natsConn, err := NewNatsClient(natsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nats client: %w", err)
+	}
+
 	return &Infrastructure{
 		Postgres: pgAdapter,
 		Redis:    redisClient,
-	}, nil
+		NatsConn: natsConn,
+	},
+		nil
 }
 
 // Close closes all infrastructure connections
@@ -93,5 +111,8 @@ func (i *Infrastructure) Close() {
 	}
 	if i.Redis != nil {
 		i.Redis.Close()
+	}
+	if i.NatsConn != nil {
+		i.NatsConn.Close()
 	}
 }
