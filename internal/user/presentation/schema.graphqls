@@ -1,0 +1,42 @@
+type User {
+    id: ID!
+    name: String!
+    email: String!
+    isEmailVerified: Boolean!
+    avatarUrl: String
+    createdAt: Time!
+    updatedAt: Time!
+    lastLoginAt: Time
+    isDeleted: Boolean!
+}
+
+type LoginResponse {
+    accessToken: String!
+    refreshToken: String!
+}
+
+input RegisterUserInput {
+    name: String!
+    email: String!
+    password: String!
+}
+
+input LoginInput {
+    email: String!
+    password: String!
+}
+
+input LogoutInput {
+    token: String!
+}
+
+type Query {
+    me: User
+}
+
+type Mutation {
+    register(input: RegisterUserInput!): User
+    login(input: LoginInput!): LoginResponse
+    logout(input: LogoutInput!): Boolean
+    deleteUser(id: ID!): Boolean
+}

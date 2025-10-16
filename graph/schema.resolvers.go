@@ -11,14 +11,39 @@ import (
 	"github.com/jefersonprimer/chatear-backend/graph/model"
 )
 
-// CreateTodo is the resolver for the createTodo field.
-func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: CreateTodo - createTodo"))
+// Register is the resolver for the register field.
+func (r *mutationResolver) Register(ctx context.Context, input model.RegisterUserInput) (*model.AuthResponse, error) {
+	panic(fmt.Errorf("not implemented: Register - register"))
 }
 
-// Todos is the resolver for the todos field.
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: Todos - todos"))
+// Login is the resolver for the login field.
+func (r *mutationResolver) Login(ctx context.Context, input model.UserLoginInput) (*model.AuthResponse, error) {
+	panic(fmt.Errorf("not implemented: Login - login"))
+}
+
+// Logout is the resolver for the logout field.
+func (r *mutationResolver) Logout(ctx context.Context, refreshToken string) (*model.MessageResponse, error) {
+	panic(fmt.Errorf("not implemented: Logout - logout"))
+}
+
+// RecoverPassword is the resolver for the recoverPassword field.
+func (r *mutationResolver) RecoverPassword(ctx context.Context, input model.UserRecoverPasswordInput) (*model.MessageResponse, error) {
+	panic(fmt.Errorf("not implemented: RecoverPassword - recoverPassword"))
+}
+
+// DeleteAccount is the resolver for the deleteAccount field.
+func (r *mutationResolver) DeleteAccount(ctx context.Context, input model.UserDeleteAccountInput) (*model.MessageResponse, error) {
+	panic(fmt.Errorf("not implemented: DeleteAccount - deleteAccount"))
+}
+
+// RecoverAccount is the resolver for the recoverAccount field.
+func (r *mutationResolver) RecoverAccount(ctx context.Context, input model.UserRecoverAccountInput) (*model.AuthResponse, error) {
+	panic(fmt.Errorf("not implemented: RecoverAccount - recoverAccount"))
+}
+
+// Me is the resolver for the me field.
+func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: Me - me"))
 }
 
 // Mutation returns MutationResolver implementation.

@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: cheater-backend-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - nats
+    environment:
+      - REDIS_ADDR=redis:6379
+      - NATS_URL=nats://nats:4222
+    networks:
+      - cheater-backend-network
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: cheater-backend-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # HTTP monitoring
+    command:
+      - "--jetstream"
+      - "--http_port=8222"
+      - "--port=4222"
+    volumes:
+      - nats-data:/data
+    networks:
+      - cheater-backend-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: cheater-backend-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - cheater-backend-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: cheater-backend-postgres
+    environment:
+      POSTGRES_DB: cheater-backend
+      POSTGRES_USER: cheater-backend
+      POSTGRES_PASSWORD: cheater-backend
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - cheater-backend-network
+
+  nats-box:
+    image: natsio/nats-box:latest
+    container_name: cheater-backend-nats-box
+    depends_on:
+      - nats
+    networks:
+      - cheater-backend-network
+    command: ["nats", "sub", "--server", "nats://nats:4222", ">"]
+    profiles:
+      - tools
+
+volumes:
+  nats-data:
+  redis-data:
+  postgres-data:
+
+networks:
+  cheater-backend-network:
+    driver: bridge

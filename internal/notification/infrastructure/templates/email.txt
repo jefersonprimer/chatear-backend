@@ -1,0 +1,7 @@
+Subject: {{.Subject}}
+
+{{.Body}}
+
+---
+This email was sent to {{.Recipient}}
+If you didn't request this email, please ignore it.
