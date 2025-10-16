@@ -1,118 +1,68 @@
-# Chatear Backend - Clean Architecture
+# Architecture Overview
 
-## Overview
+This project follows a layered architectural pattern, aiming for separation of concerns, maintainability, and testability. The primary layers are:
 
-This project follows Clean Architecture principles with Domain-Driven Design (DDD) and SOLID principles to create a maintainable, testable, and scalable modular monolith.
+1.  **Presentation Layer (`cmd/api`, `graph`, `presentation`)**:
+    *   Handles incoming requests (HTTP, GraphQL).
+    *   Translates requests into commands or queries for the Application Layer.
+    *   Serializes responses back to the client.
+    *   Dependencies: Application Layer.
 
-## Architecture Layers
+2.  **Application Layer (`application`, `internal/*/application`)**:
+    *   Orchestrates business logic and use cases.
+    *   Contains application-specific services and use cases (e.g., `user_usecases.go`).
+    *   Coordinates interactions between the Domain Layer and Infrastructure Layer.
+    *   Dependencies: Domain Layer, Infrastructure Layer (via interfaces).
 
-### 1. Domain Layer (`domain/`)
-Contains the core business logic and entities. This layer is independent of any external concerns.
+3.  **Domain Layer (`domain`, `internal/*/domain`)**:
+    *   Contains the core business logic, entities, value objects, and interfaces for repositories and services.
+    *   Independent of other layers.
+    *   Dependencies: None (pure business logic).
 
-**Responsibilities:**
-- Business entities and value objects
-- Domain services
-- Repository interfaces
-- Domain events
-- Business rules and validation
+4.  **Infrastructure Layer (`infrastructure`, `internal/*/infrastructure`)**:
+    *   Provides implementations for interfaces defined in the Domain Layer.
+    *   Handles external concerns like databases, external APIs, messaging queues, caching, etc.
+    *   Examples: `infrastructure/database/postgres_user_repository.go`, `infrastructure/messaging`.
+    *   Dependencies: Domain Layer (implements its interfaces).
 
-### 2. Application Layer (`application/`)
-Contains use cases and application services that orchestrate the domain layer.
+5.  **Shared Layer (`shared`)**:
+    *   Contains common utilities, cross-cutting concerns like authentication middleware, error handling, and constants.
+    *   Dependencies: None (or very few, foundational).
 
-**Responsibilities:**
-- Use case implementations
-- Application services
-- Command and query handlers
-- DTOs and mappers
-- Application events
+## Dependency Flow
 
-### 3. Infrastructure Layer (`infrastructure/`)
-Contains implementations of external concerns like databases, external APIs, and frameworks.
-
-**Responsibilities:**
-- Database implementations
-- External service integrations
-- Framework-specific code
-- Configuration management
-- Third-party library integrations
-
-### 4. Presentation Layer (`presentation/`)
-Contains the API endpoints, GraphQL resolvers, and web framework code.
-
-**Responsibilities:**
-- HTTP handlers
-- GraphQL resolvers
-- Request/response mapping
-- Authentication middleware
-- API documentation
-
-### 5. Shared Layer (`shared/`)
-Contains common utilities and cross-cutting concerns used across all layers.
-
-**Responsibilities:**
-- Common utilities
-- Shared constants
-- Cross-cutting concerns
-- Common interfaces
-
-## Module Organization
-
-The project is organized into feature modules within the `internal/` directory:
+The dependencies generally flow inwards: Presentation -> Application -> Domain. The Infrastructure layer depends on the Domain layer by implementing its interfaces. The Shared layer provides utilities that can be used across multiple layers without introducing circular dependencies.
 
 ```
-internal/
-├── user/
-│   ├── domain/
-│   ├── application/
-│   ├── infrastructure/
-│   └── presentation/
-└── notification/
-    ├── domain/
-    ├── application/
-    ├── infrastructure/
-    └── presentation/
++-------------------+
+|    Presentation   |
+| (cmd/api, graph)  |
++---------+---------+
+          |
+          v
++---------+---------+
+|    Application    |
+| (application,     |
+|  internal/*/app)  |
++---------+---------+
+          |
+          v
++---------+---------+
+|      Domain       |
+| (domain,          |
+|  internal/*/domain)|
++---------+---------+
+          ^
+          |
++---------+---------+
+|   Infrastructure  |
+| (infrastructure,  |
+|  internal/*/infra)|
++-------------------+
+
++-------------------+
+|       Shared      |
+|    (shared)       |
++-------------------+
+  (Used by all layers)
 ```
-
-Each module is self-contained and follows the same Clean Architecture pattern.
-
-## Technology Stack
-
-- **Language:** Go 1.25.3
-- **Web Framework:** Gin
-- **API:** GraphQL (gqlgen)
-- **Database:** PostgreSQL
-- **Cache:** Redis
-- **Message Queue:** NATS
-- **Authentication:** JWT
-- **Email:** SMTP
-
-## Dependencies Flow
-
-The dependency flow follows Clean Architecture principles:
-
-```
-Presentation → Application → Domain
-     ↓              ↓
-Infrastructure → Application → Domain
-```
-
-- Inner layers don't depend on outer layers
-- Dependencies point inward
-- Interfaces are defined in inner layers
-- Implementations are in outer layers
-
-## SOLID Principles
-
-1. **Single Responsibility Principle (SRP):** Each class/module has one reason to change
-2. **Open/Closed Principle (OCP):** Open for extension, closed for modification
-3. **Liskov Substitution Principle (LSP):** Derived classes must be substitutable for their base classes
-4. **Interface Segregation Principle (ISP):** Clients shouldn't depend on interfaces they don't use
-5. **Dependency Inversion Principle (DIP):** Depend on abstractions, not concretions
-
-## Getting Started
-
-1. Clone the repository
-2. Install dependencies: `go mod tidy`
-3. Copy environment file: `cp env.example .env`
-4. Configure your environment variables
-5. Run the application: `go run cmd/api/main.go`

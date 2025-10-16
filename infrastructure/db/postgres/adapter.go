@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -37,7 +39,7 @@ func (a *Adapter) Close() {
 
 // RunMigrations runs database migrations from the specified directory
 func (a *Adapter) RunMigrations(migrationsPath string) error {
-	// For now, skip migrations in the worker context
+	// For now, skip migrations in worker context
 	// This should be handled by the main application
 	log.Println("Migrations skipped in worker context")
 	return nil
@@ -46,4 +48,19 @@ func (a *Adapter) RunMigrations(migrationsPath string) error {
 // Health checks the database connection health
 func (a *Adapter) Health(ctx context.Context) error {
 	return a.Pool.Ping(ctx)
+}
+
+// QueryRow delegates to the underlying pgxpool.Pool
+func (a *Adapter) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	return a.Pool.QueryRow(ctx, sql, args...)
+}
+
+// Exec delegates to the underlying pgxpool.Pool
+func (a *Adapter) Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error) {
+	return a.Pool.Exec(ctx, sql, arguments...)
+}
+
+// Query delegates to the underlying pgxpool.Pool
+func (a *Adapter) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+	return a.Pool.Query(ctx, sql, args...)
 }

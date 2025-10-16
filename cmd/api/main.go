@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gin-gonic/gin"
-	"github.com/primer/chatear-backend/infrastructure"
-	userInfra "github.com/primer/chatear-backend/internal/user/infrastructure"
-	userDomain "github.com/primer/chatear-backend/internal/user/domain"
-	userApp "github.com/primer/chatear-backend/internal/user/application"
-	userHTTP "github.com/primer/chatear-backend/presentation/http"
-	"github.com/primer/chatear-backend/shared/auth"
+	"github.com/jefersonprimer/chatear-backend/graph"
+	"github.com/jefersonprimer/chatear-backend/infrastructure"
+	userInfra "github.com/jefersonprimer/chatear-backend/internal/user/infrastructure"
+	userDomain "github.com/jefersonprimer/chatear-backend/internal/user/domain"
+	userApp "github.com/jefersonprimer/chatear-backend/internal/user/application"
+	userHTTP "github.com/jefersonprimer/chatear-backend/presentation/http"
+	"github.com/jefersonprimer/chatear-backend/shared/auth"
+	"github.com/jefersonprimer/chatear-backend/shared/constants"
 )
 
 func main() {
@@ -40,14 +46,32 @@ func SetupServer() (*gin.Engine, error) {
 	}
 
 	// Initialize repositories
-	userRepo := userInfra.NewPostgresUserRepository(infra.Postgres)
+	userRepo := userInfra.NewPostgresUserRepository(infra.Postgres.Pool)
 	blacklistRepo := userInfra.NewRedisBlacklistRepository(infra.Redis)
+	refreshTokenRepo := userInfra.NewPostgresRefreshTokenRepository(infra.Postgres)
+	emailRepo := userInfra.NewPostgresEmailRepository(infra.Postgres)
+	tokenRepo := userInfra.NewRedisTokenRepository(infra.Redis)
+	deletionCapacityRepo := userInfra.NewPostgresDeletionCapacityRepository(infra.Postgres)
+	userDeletionRepo := userInfra.NewPostgresUserDeletionRepository(infra.Postgres)
 
-	// Initialize services
-	userService := userApp.NewService(userRepo, blacklistRepo)
+	// Initialize event bus (NATS for example)
+	eventBus := userInfra.NewNatsEventBus(infra.NatsConn)
+
+	// Initialize shared services
+	tokenService := auth.NewTokenService()
+
+	// Initialize user application services
+	userAppService := userApp.NewUserApplicationService(
+		userRepo,
+		refreshTokenRepo,
+		blacklistRepo,
+		eventBus,
+		constants.AccessTokenExpiration,
+		constants.RefreshTokenExpiration,
+	)
 
 	// Initialize HTTP handlers
-	userHandler := userHTTP.NewUserHandler(userService)
+	userHandler := userHTTP.NewUserHandler(userAppService)
 
 	r := gin.Default()
 
@@ -65,6 +89,24 @@ func SetupServer() (*gin.Engine, error) {
 		authRoutes.GET("/me", userHandler.GetMe)
 		authRoutes.POST("/logout", userHandler.Logout)
 	}
+
+	// GraphQL setup
+	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
+		Resolvers: &graph.Resolver{
+			UserAppService: userAppService,
+			TokenService:   tokenService,
+		},
+	}))
+
+	r.POST("/graphql", func(c *gin.Context) {
+		// Apply JWT middleware to GraphQL endpoint
+		// This middleware will extract the token and add user info to context
+		auth.AuthMiddleware(blacklistRepo)(c)
+		// Pass the Gin context to the GraphQL handler
+		srv.ServeHTTP(c.Writer, c.Request)
+	})
+
+	r.GET("/playground", playground.Handler("GraphQL playground", "/graphql"))
 
 	return r, nil
 }

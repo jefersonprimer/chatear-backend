@@ -36,41 +36,43 @@ Authenticates a user and returns access and refresh tokens.
     - `refreshToken`: Refresh token (String!)
     - `user`: The logged-in user (User!)
 
-### `logout: MessageResponse!`
+### `logout: Boolean!`
 
 Logs out the current user by invalidating their session and tokens.
 
 - **Input:** None
-- **Output:** `MessageResponse`
-    - `message`: A confirmation message (String!)
+- **Output:** `Boolean!`
+    - `true` if logout was successful, `false` otherwise.
 
-### `recoverPassword(input: RecoverPasswordInput!): MessageResponse!`
+### `recoverPassword(input: RecoverPasswordInput!): Boolean!`
 
 Initiates the password recovery process for a given email.
 
 - **Input:** `RecoverPasswordInput`
     - `email`: User's email address (String!)
-- **Output:** `MessageResponse`
-    - `message`: A confirmation message (String!)
+- **Output:** `Boolean!`
+    - `true` if recovery email was sent successfully, `false` otherwise.
 
-### `deleteAccount(input: DeleteAccountInput!): MessageResponse!`
+### `deleteAccount(input: DeleteAccountInput!): Boolean!`
 
-Deletes the authenticated user's account.
+Schedules the authenticated user's account for deletion.
 
 - **Input:** `DeleteAccountInput`
-    - `password`: Current password for confirmation (String!)
-- **Output:** `MessageResponse`
-    - `message`: A confirmation message (String!)
+    - `userID`: ID of the user to be deleted (ID!)
+- **Output:** `Boolean!`
+    - `true` if deletion was scheduled successfully, `false` otherwise.
 
-### `recoverAccount(input: RecoverAccountInput!): MessageResponse!`
+### `recoverAccount(input: RecoverAccountInput!): AuthResponse!`
 
 Recovers a user account using a recovery token and sets a new password.
 
 - **Input:** `RecoverAccountInput`
     - `token`: The recovery token (String!)
     - `newPassword`: The new password (String!)
-- **Output:** `MessageResponse`
-    - `message`: A confirmation message (String!)
+- **Output:** `AuthResponse`
+    - `accessToken`: JWT access token (String!)
+    - `refreshToken`: Refresh token (String!)
+    - `user`: The recovered user (User!)
 
 ## Types
 
@@ -82,18 +84,23 @@ Represents the response after successful authentication or registration.
 - `refreshToken`: String!
 - `user`: User!
 
-### `MessageResponse`
 
-A generic response type for operations that return a simple message.
-
-- `message`: String!
 
 ### `User`
 
 Represents a user in the system.
 
 - `id`: ID!
+- `name`: String!
 - `email`: String!
+- `createdAt`: String!
+- `updatedAt`: String!
+- `isEmailVerified`: Boolean!
+- `deletedAt`: String
+- `avatarURL`: String
+- `deletionDueAt`: String
+- `lastLoginAt`: String
+- `isDeleted`: Boolean!
 
 ## Input Objects
 
@@ -101,6 +108,7 @@ Represents a user in the system.
 
 Input for the `registerUser` mutation.
 
+- `name`: String!
 - `email`: String!
 - `password`: String!
 
@@ -121,7 +129,7 @@ Input for the `recoverPassword` mutation.
 
 Input for the `deleteAccount` mutation.
 
-- `password`: String!
+- `userID`: ID!
 
 ### `RecoverAccountInput`
 

@@ -1,137 +1,98 @@
 # Chatear Backend
 
-This is the backend service for Chatear, a real-time chat application built with Clean Architecture principles.
+This is the backend service for the Chatear application, built with Go. It provides a robust and scalable foundation for real-time communication features, user management, and notifications.
 
-## Tech Stack
+## Table of Contents
 
-*   **Go 1.25.3:** The primary programming language
-*   **Gin:** A web framework for building APIs
-*   **GraphQL:** A query language for your API (using gqlgen)
-*   **PostgreSQL:** Primary database
-*   **Redis:** Caching and session storage
-*   **NATS:** Message queue for real-time features
-*   **JWT:** Authentication and authorization
-*   **SMTP:** Email notifications
-
-## Architecture
-
-This project follows **Clean Architecture** principles with **Domain-Driven Design (DDD)** and **SOLID** principles:
-
-- **Domain Layer:** Core business logic and entities
-- **Application Layer:** Use cases and application services
-- **Infrastructure Layer:** External concerns (database, external APIs)
-- **Presentation Layer:** API endpoints and GraphQL resolvers
-- **Shared Layer:** Common utilities and cross-cutting concerns
-
-For detailed architecture documentation, see [docs/architecture.md](docs/architecture.md).
+*   [Prerequisites](#prerequisites)
+*   [Setup](#setup)
+*   [Running the API Server](#running-the-api-server)
+*   [Running the Notification Worker](#running-the-notification-worker)
+*   [Running the User Delete Worker](#running-the-user-delete-worker)
+*   [Running Tests](#running-tests)
+*   [Documentation](#documentation)
 
 ## Prerequisites
 
-- Go 1.25.3 or later
-- PostgreSQL 12 or later
-- Redis 6 or later
-- NATS Server 2.0 or later
+Before you begin, ensure you have the following installed:
+
+*   **Go**: Version 1.25.3 or higher.
+*   **PostgreSQL**: A running PostgreSQL instance for data persistence.
+*   **Redis**: A running Redis instance for caching, session management, and rate limiting.
+*   **NATS**: A running NATS server for inter-service communication and event streaming.
 
 ## Setup
 
-1.  **Clone the repository:**
+1.  **Clone the repository**:
+
     ```bash
     git clone https://github.com/jefersonprimer/chatear-backend.git
     cd chatear-backend
     ```
 
-2.  **Install dependencies:**
+2.  **Download Go modules**:
+
     ```bash
-    go mod tidy
+    go mod download
     ```
 
-3.  **Create a `.env` file:**
+3.  **Configure environment variables**:
+
+    Copy the example environment file and update it with your specific configurations for database, Redis, NATS, JWT secrets, and SMTP settings.
+
     ```bash
     cp env.example .env
+    # Open .env in your editor and fill in the details
     ```
 
-4.  **Update the `.env` file with your credentials:**
-    - Configure your database connection
-    - Set up Redis connection
-    - Configure NATS server
-    - Set up SMTP for email notifications
-    - Generate a secure JWT secret
+    Refer to `docs/env.md` for a detailed explanation of each environment variable.
 
-5.  **Run database migrations:**
-    ```bash
-    # Run the migration scripts in the migrations/ directory
-    # This depends on your migration tool setup
-    ```
+## Running the API Server
 
-## Run
-
-### Development Mode
+The API server exposes the GraphQL and HTTP endpoints for the application.
 
 ```bash
 go run cmd/api/main.go
 ```
 
-### Production Mode
+The server will typically start on the port specified in your `.env` file (default: `8080`).
+
+## Running the Notification Worker
+
+The notification worker processes email sending tasks from the NATS queue.
 
 ```bash
-go build -o chatear-backend cmd/api/main.go
-./chatear-backend
+go run cmd/worker/notification_worker.go
 ```
 
-## Project Structure
+## Running the User Delete Worker
 
-```
-├── cmd/                    # Application entry points
-│   ├── api/               # Main API server
-│   └── worker/            # Background workers
-├── internal/              # Feature modules
-│   ├── user/             # User management module
-│   └── notification/     # Notification module
-├── domain/               # Domain layer (entities, repositories)
-├── application/          # Application layer (use cases, services)
-├── infrastructure/       # Infrastructure layer (database, external services)
-├── presentation/         # Presentation layer (HTTP, GraphQL)
-├── shared/              # Shared utilities and constants
-├── docs/                # Architecture and API documentation
-├── migrations/          # Database migrations
-└── env.example         # Environment variables template
+The user delete worker handles asynchronous user account deletion processes.
+
+```bash
+go run cmd/worker/user_delete_worker.go
 ```
 
-## API Documentation
+## Running Tests
 
-- **GraphQL API:** Available at `/graphql` endpoint
-- **Health Check:** Available at `/health` endpoint
-- **API Documentation:** See [docs/graphql_api.md](docs/graphql_api.md)
-
-## Development
-
-### Running Tests
+To run all unit and integration tests for the project:
 
 ```bash
 go test ./...
 ```
 
-### Code Generation
+To run tests with verbose output:
 
 ```bash
-# Generate GraphQL code
-go generate ./...
-
-# Or run gqlgen directly
-go run github.com/99designs/gqlgen generate
+go test -v ./...
 ```
 
-### Database Migrations
+## Documentation
 
-Database migrations are located in the `migrations/` directory. Run them using your preferred migration tool.
+Detailed documentation for the project's architecture, dependencies, environment variables, and domain-specific workflows can be found in the `docs/` directory:
 
-## Contributing
-
-1. Follow Clean Architecture principles
-2. Write tests for new features
-3. Update documentation as needed
-4. Follow Go coding standards
-
-## License
-
-This project is licensed under the MIT License.
+*   [Architecture Overview](docs/architecture.md)
+*   [Project Dependencies](docs/dependencies.md)
+*   [Environment Variables](docs/env.md)
+*   [User Domain](docs/user_domain.md)
+*   [Notification Domain](docs/notification_domain.md)

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/primer/chatear-backend/shared/constants"
+	"github.com/jefersonprimer/chatear-backend/shared/constants"
 )
 
 // Claims defines the structure of our JWT claims
@@ -14,8 +14,16 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+type TokenService struct {
+}
+
+// NewTokenService creates a new TokenService
+func NewTokenService() *TokenService {
+	return &TokenService{}
+}
+
 // GenerateAccessToken creates a new JWT access token
-func GenerateAccessToken(userID string) (string, error) {
+func (s *TokenService) GenerateAccessToken(userID string) (string, error) {
 	expirationTime := time.Now().Add(constants.AccessTokenExpiration)
 	claims := &Claims{
 		UserID: userID,
@@ -34,7 +42,7 @@ func GenerateAccessToken(userID string) (string, error) {
 }
 
 // ValidateAccessToken validates the JWT access token and returns the claims
-func ValidateAccessToken(tokenString string) (*Claims, error) {
+func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -55,14 +63,14 @@ func ValidateAccessToken(tokenString string) (*Claims, error) {
 }
 
 // GenerateRefreshToken creates a new refresh token (UUID for now, will be stored in DB)
-func GenerateRefreshToken() (string, error) {
+func (s *TokenService) GenerateRefreshToken() (string, error) {
 	// For now, a simple UUID-like string. This will be stored in the database.
 	// In a real application, you might use a cryptographically secure random string.
 	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Unix()), nil
 }
 
 // ValidateRefreshToken validates a refresh token (this will involve DB lookup later)
-func ValidateRefreshToken(token string) (bool, error) {
+func (s *TokenService) ValidateRefreshToken(token string) (bool, error) {
 	// Placeholder for now. This will involve checking against the database.
 	if token == "" {
 		return false, fmt.Errorf("refresh token is empty")

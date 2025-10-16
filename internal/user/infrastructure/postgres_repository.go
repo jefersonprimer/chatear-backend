@@ -4,18 +4,19 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jefersonprimer/chatear-backend/infrastructure"
+	"github.com/jackc/pgx/v5"
+	"github.com/jefersonprimer/chatear-backend/infrastructure/db/postgres"
 	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
 )
 
 // UserRepository is a PostgreSQL implementation of the domain.UserRepository.
 type UserRepository struct {
-	DB *infrastructure.DB
+	pool postgres.PgxPoolIface
 }
 
 // NewUserRepository creates a new UserRepository.
-func NewUserRepository(db *infrastructure.DB) *UserRepository {
-	return &UserRepository{DB: db}
+func NewUserRepository(pool postgres.PgxPoolIface) *UserRepository {
+	return &UserRepository{pool: pool}
 }
 
 // CreateUser creates a new user in the database.
@@ -25,7 +26,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, user *domain.User) erro
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING created_at, updated_at`
 
-	return r.DB.Pool.QueryRow(ctx, query,
+	return r.pool.QueryRow(ctx, query,
 		user.ID,
 		user.Name,
 		user.Email,
@@ -43,7 +44,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*domain
 		FROM users
 		WHERE id = $1`
 
-	err := r.DB.Pool.QueryRow(ctx, query, id).Scan(
+	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -73,7 +74,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 		FROM users
 		WHERE email = $1`
 
-	err := r.DB.Pool.QueryRow(ctx, query, email).Scan(
+	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -103,7 +104,7 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) erro
 		WHERE id = $1
 		RETURNING updated_at`
 
-	return r.DB.Pool.QueryRow(ctx, query,
+	return r.pool.QueryRow(ctx, query,
 		user.ID,
 		user.Name,
 		user.Email,
@@ -120,6 +121,6 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) erro
 // DeleteUser deletes a user from the database.
 func (r *UserRepository) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE users SET is_deleted = true, deleted_at = now() WHERE id = $1`
-	_, err := r.DB.Pool.Exec(ctx, query, id)
+	_, err := r.pool.Exec(ctx, query, id)
 	return err
 }

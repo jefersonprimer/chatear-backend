@@ -2,60 +2,60 @@
 #
 # https://gqlgen.com/getting-started/
 
-type Query {
-  me: User!
-}
-
-type Mutation {
-  register(input: RegisterUserInput!): AuthResponse!
-  login(input: UserLoginInput!): AuthResponse!
-  logout(refreshToken: String!): MessageResponse!
-  recoverPassword(input: UserRecoverPasswordInput!): MessageResponse!
-  deleteAccount(input: UserDeleteAccountInput!): MessageResponse!
-  recoverAccount(input: UserRecoverAccountInput!): AuthResponse!
-}
-
 type User {
   id: ID!
+  name: String!
   email: String!
-  username: String!
-  createdAt: Time!
-  updatedAt: Time!
+  createdAt: String!
+  updatedAt: String!
+  isEmailVerified: Boolean!
+  deletedAt: String
+  avatarURL: String
+  deletionDueAt: String
+  lastLoginAt: String
+  isDeleted: Boolean!
 }
 
 type AuthResponse {
+  user: User!
   accessToken: String!
   refreshToken: String!
-  user: User!
-}
-
-type MessageResponse {
-  message: String!
 }
 
 input RegisterUserInput {
-  email: String!
-  username: String!
-  password: String!
-}
-
-input UserLoginInput {
+  name: String!
   email: String!
   password: String!
 }
 
-input UserRecoverPasswordInput {
+input LoginInput {
   email: String!
-}
-
-input UserDeleteAccountInput {
   password: String!
 }
 
-input UserRecoverAccountInput {
+input RecoverPasswordInput {
   email: String!
+}
+
+input DeleteAccountInput {
+  userID: ID!
+}
+
+input RecoverAccountInput {
   token: String!
-  password: String!
+  newPassword: String!
 }
 
-scalar Time
+type Query {
+  # Placeholder for future queries
+  hello: String!
+}
+
+type Mutation {
+  registerUser(input: RegisterUserInput!): AuthResponse!
+  login(input: LoginInput!): AuthResponse!
+  logout: Boolean!
+  recoverPassword(input: RecoverPasswordInput!): Boolean!
+  deleteAccount(input: DeleteAccountInput!): Boolean!
+  recoverAccount(input: RecoverAccountInput!): Boolean!
+}

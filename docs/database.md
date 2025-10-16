@@ -38,6 +38,16 @@ CREATE TABLE public.magic_links (
   CONSTRAINT magic_links_pkey PRIMARY KEY (id),
   CONSTRAINT magic_links_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.notifications (
+  id uuid NOT NULL,
+  type character varying NOT NULL,
+  recipient character varying NOT NULL,
+  subject character varying NOT NULL,
+  body text NOT NULL,
+  sent_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT notifications_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.refresh_tokens (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,

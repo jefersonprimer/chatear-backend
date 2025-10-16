@@ -2,18 +2,19 @@
 
 package model
 
-import (
-	"time"
-)
-
 type AuthResponse struct {
+	User         *User  `json:"user"`
 	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
-	User         *User  `json:"user"`
 }
 
-type MessageResponse struct {
-	Message string `json:"message"`
+type DeleteAccountInput struct {
+	UserID string `json:"userID"`
+}
+
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type Mutation struct {
@@ -22,35 +23,31 @@ type Mutation struct {
 type Query struct {
 }
 
+type RecoverAccountInput struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"newPassword"`
+}
+
+type RecoverPasswordInput struct {
+	Email string `json:"email"`
+}
+
 type RegisterUserInput struct {
+	Name     string `json:"name"`
 	Email    string `json:"email"`
-	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type UserDeleteAccountInput struct {
-	Password string `json:"password"`
-}
-
-type UserLoginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type UserRecoverAccountInput struct {
-	Email    string `json:"email"`
-	Token    string `json:"token"`
-	Password string `json:"password"`
-}
-
-type UserRecoverPasswordInput struct {
-	Email string `json:"email"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	Email           string  `json:"email"`
+	CreatedAt       string  `json:"createdAt"`
+	UpdatedAt       string  `json:"updatedAt"`
+	IsEmailVerified bool    `json:"isEmailVerified"`
+	DeletedAt       *string `json:"deletedAt,omitempty"`
+	AvatarURL       *string `json:"avatarURL,omitempty"`
+	DeletionDueAt   *string `json:"deletionDueAt,omitempty"`
+	LastLoginAt     *string `json:"lastLoginAt,omitempty"`
+	IsDeleted       bool    `json:"isDeleted"`
 }

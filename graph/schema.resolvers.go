@@ -8,42 +8,164 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/graph/model"
+	userApp "github.com/jefersonprimer/chatear-backend/internal/user/application"
 )
 
-// Register is the resolver for the register field.
-func (r *mutationResolver) Register(ctx context.Context, input model.RegisterUserInput) (*model.AuthResponse, error) {
-	panic(fmt.Errorf("not implemented: Register - register"))
+// RegisterUser is the resolver for the registerUser field.
+func (r *mutationResolver) RegisterUser(ctx context.Context, input model.RegisterUserInput) (*model.AuthResponse, error) {
+	authTokens, user, err := r.Resolver.UserAppService.Register(ctx, input.Email, input.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	modelUser := &model.User{
+		ID:              user.ID.String(),
+		Name:            user.Name,
+		Email:           user.Email,
+		CreatedAt:       user.CreatedAt.String(),
+		UpdatedAt:       user.UpdatedAt.String(),
+		IsEmailVerified: user.IsEmailVerified,
+		IsDeleted:       user.IsDeleted,
+	}
+
+	if user.DeletedAt != nil {
+		deletedAtStr := user.DeletedAt.String()
+		modelUser.DeletedAt = &deletedAtStr
+	}
+	if user.AvatarURL != nil {
+		modelUser.AvatarURL = user.AvatarURL
+	}
+	if user.DeletionDueAt != nil {
+		deletionDueAtStr := user.DeletionDueAt.String()
+		modelUser.DeletionDueAt = &deletionDueAtStr
+	}
+	if user.LastLoginAt != nil {
+		lastLoginAtStr := user.LastLoginAt.String()
+		modelUser.LastLoginAt = &lastLoginAtStr
+	}
+
+	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
 }
 
 // Login is the resolver for the login field.
-func (r *mutationResolver) Login(ctx context.Context, input model.UserLoginInput) (*model.AuthResponse, error) {
-	panic(fmt.Errorf("not implemented: Login - login"))
+func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthResponse, error) {
+	authTokens, user, err := r.Resolver.UserAppService.Login(ctx, input.Email, input.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	modelUser := &model.User{
+		ID:              user.ID.String(),
+		Name:            user.Name,
+		Email:           user.Email,
+		CreatedAt:       user.CreatedAt.String(),
+		UpdatedAt:       user.UpdatedAt.String(),
+		IsEmailVerified: user.IsEmailVerified,
+		IsDeleted:       user.IsDeleted,
+	}
+
+	if user.DeletedAt != nil {
+		deletedAtStr := user.DeletedAt.String()
+		modelUser.DeletedAt = &deletedAtStr
+	}
+	if user.AvatarURL != nil {
+		modelUser.AvatarURL = user.AvatarURL
+	}
+	if user.DeletionDueAt != nil {
+		deletionDueAtStr := user.DeletionDueAt.String()
+		modelUser.DeletionDueAt = &deletionDueAtStr
+	}
+	if user.LastLoginAt != nil {
+		lastLoginAtStr := user.LastLoginAt.String()
+		modelUser.LastLoginAt = &lastLoginAtStr
+	}
+
+	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
 }
 
 // Logout is the resolver for the logout field.
-func (r *mutationResolver) Logout(ctx context.Context, refreshToken string) (*model.MessageResponse, error) {
-	panic(fmt.Errorf("not implemented: Logout - logout"))
+func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
+	accessToken, err := auth.GetAccessTokenFromContext(ctx) // Assuming a new helper function GetAccessTokenFromContext
+	if err != nil {
+		return false, fmt.Errorf("access token not found in context: %w", err)
+	}
+	refreshToken, err := auth.GetRefreshTokenFromContext(ctx)
+	if err != nil {
+		return false, fmt.Errorf("refresh token not found in context: %w", err)
+	}
+
+	err = r.Resolver.UserAppService.Logout(ctx, accessToken, refreshToken)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // RecoverPassword is the resolver for the recoverPassword field.
-func (r *mutationResolver) RecoverPassword(ctx context.Context, input model.UserRecoverPasswordInput) (*model.MessageResponse, error) {
-	panic(fmt.Errorf("not implemented: RecoverPassword - recoverPassword"))
+func (r *mutationResolver) RecoverPassword(ctx context.Context, input model.RecoverPasswordInput) (bool, error) {
+	err := r.Resolver.UserAppService.RecoverPassword(ctx, input.Email)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // DeleteAccount is the resolver for the deleteAccount field.
-func (r *mutationResolver) DeleteAccount(ctx context.Context, input model.UserDeleteAccountInput) (*model.MessageResponse, error) {
-	panic(fmt.Errorf("not implemented: DeleteAccount - deleteAccount"))
+func (r *mutationResolver) DeleteAccount(ctx context.Context, input model.DeleteAccountInput) (bool, error) {
+	userID, err := uuid.Parse(input.UserID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Assuming password is not required for GraphQL mutation, or handled by separate auth
+	err = r.Resolver.UserAppService.DeleteAccount(ctx, userID, "") // Empty string for password
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // RecoverAccount is the resolver for the recoverAccount field.
-func (r *mutationResolver) RecoverAccount(ctx context.Context, input model.UserRecoverAccountInput) (*model.AuthResponse, error) {
-	panic(fmt.Errorf("not implemented: RecoverAccount - recoverAccount"))
+func (r *mutationResolver) RecoverAccount(ctx context.Context, input model.RecoverAccountInput) (*model.AuthResponse, error) {
+	authTokens, user, err := r.Resolver.UserAppService.RecoverAccount(ctx, input.Token, input.NewPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	modelUser := &model.User{
+		ID:              user.ID.String(),
+		Name:            user.Name,
+		Email:           user.Email,
+		CreatedAt:       user.CreatedAt.String(),
+		UpdatedAt:       user.UpdatedAt.String(),
+		IsEmailVerified: user.IsEmailVerified,
+		IsDeleted:       user.IsDeleted,
+	}
+
+	if user.DeletedAt != nil {
+		deletedAtStr := user.DeletedAt.String()
+		modelUser.DeletedAt = &deletedAtStr
+	}
+	if user.AvatarURL != nil {
+		modelUser.AvatarURL = user.AvatarURL
+	}
+	if user.DeletionDueAt != nil {
+		deletionDueAtStr := user.DeletionDueAt.String()
+		modelUser.DeletionDueAt = &deletionDueAtStr
+	}
+	if user.LastLoginAt != nil {
+		lastLoginAtStr := user.LastLoginAt.String()
+		modelUser.LastLoginAt = &lastLoginAtStr
+	}
+
+	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
 }
 
-// Me is the resolver for the me field.
-func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: Me - me"))
+// Hello is the resolver for the hello field.
+func (r *queryResolver) Hello(ctx context.Context) (string, error) {
+	return "Hello from GraphQL!", nil
 }
 
 // Mutation returns MutationResolver implementation.

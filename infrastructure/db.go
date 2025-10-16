@@ -3,10 +3,11 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/primer/chatear-backend/infrastructure/db/postgres"
+	"github.com/jefersonprimer/chatear-backend/infrastructure/db/postgres"
 )
 
 // DB holds the database connection pool.

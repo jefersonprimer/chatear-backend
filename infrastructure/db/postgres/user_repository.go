@@ -5,19 +5,28 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jefersonprimer/chatear-backend/domain/entities"
 	"github.com/jefersonprimer/chatear-backend/domain/repositories"
 )
 
+// PgxPoolIface defines the methods of pgxpool.Pool that userRepository uses
+type PgxPoolIface interface {
+	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
+}
+
 // userRepository implements the UserRepository interface
 type userRepository struct {
-	adapter *Adapter
+	pool PgxPoolIface
 }
 
 // NewUserRepository creates a new user repository
-func NewUserRepository(adapter *Adapter) repositories.UserRepository {
+func NewUserRepository(pool PgxPoolIface) repositories.UserRepository {
 	return &userRepository{
-		adapter: adapter,
+		pool: pool,
 	}
 }
 
@@ -28,7 +37,7 @@ func (r *userRepository) Create(ctx context.Context, user *entities.User) error 
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING created_at, updated_at`
 
-	return r.adapter.Pool.QueryRow(ctx, query,
+	return r.pool.QueryRow(ctx, query,
 		user.ID,
 		user.Name,
 		user.Email,
@@ -47,7 +56,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.U
 		FROM users
 		WHERE id = $1`
 
-	err := r.adapter.Pool.QueryRow(ctx, query, id).Scan(
+	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -78,7 +87,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*entitie
 		FROM users
 		WHERE email = $1`
 
-	err := r.adapter.Pool.QueryRow(ctx, query, email).Scan(
+	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -109,7 +118,7 @@ func (r *userRepository) Update(ctx context.Context, user *entities.User) error 
 		WHERE id = $1
 		RETURNING updated_at`
 
-	return r.adapter.Pool.QueryRow(ctx, query,
+	return r.pool.QueryRow(ctx, query,
 		user.ID,
 		user.Name,
 		user.Email,
@@ -126,7 +135,7 @@ func (r *userRepository) Update(ctx context.Context, user *entities.User) error 
 // Delete deletes a user from the database (soft delete)
 func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE users SET is_deleted = true, deleted_at = now() WHERE id = $1`
-	_, err := r.adapter.Pool.Exec(ctx, query, id)
+	_, err := r.pool.Exec(ctx, query, id)
 	return err
 }
 
@@ -140,7 +149,7 @@ func (r *userRepository) GetDeletedUsers(ctx context.Context, limit, offset int)
 		ORDER BY deleted_at DESC
 		LIMIT $1 OFFSET $2`
 
-	rows, err := r.adapter.Pool.Query(ctx, query, limit, offset)
+	rows, err := r.pool.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +191,7 @@ func (r *userRepository) GetByEmailVerified(ctx context.Context, verified bool, 
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`
 
-	rows, err := r.adapter.Pool.Query(ctx, query, verified, limit, offset)
+	rows, err := r.pool.Query(ctx, query, verified, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +234,7 @@ func (r *userRepository) SearchByName(ctx context.Context, name string, limit, o
 		LIMIT $2 OFFSET $3`
 
 	searchPattern := fmt.Sprintf("%%%s%%", name)
-	rows, err := r.adapter.Pool.Query(ctx, query, searchPattern, limit, offset)
+	rows, err := r.pool.Query(ctx, query, searchPattern, limit, offset)
 	if err != nil {
 		return nil, err
 	}

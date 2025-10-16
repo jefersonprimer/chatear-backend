@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/primer/chatear-backend/internal/user/application"
-	"github.com/primer/chatear-backend/shared/auth"
+	"github.com/jefersonprimer/chatear-backend/internal/user/application"
+	"github.com/jefersonprimer/chatear-backend/shared/auth"
 )
 
 // UserHandlers handles HTTP requests for user operations
