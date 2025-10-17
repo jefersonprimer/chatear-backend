@@ -19,4 +19,5 @@ type RefreshTokenRepository interface {
 	DeleteByUserID(ctx context.Context, userID uuid.UUID) error
 	DeleteExpired(ctx context.Context, olderThan time.Time) error
 	RevokeByUserID(ctx context.Context, userID uuid.UUID) error
+	RevokeAllByUserID(userID uuid.UUID) error
 }

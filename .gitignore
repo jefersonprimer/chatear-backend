@@ -1,0 +1,68 @@
+# ----------------------------------------
+# Go build artifacts
+# ----------------------------------------
+/bin/
+/build/
+/dist/
+/out/
+/tmp/
+/coverage.out
+*.exe
+*.test
+*.out
+
+# ----------------------------------------
+# Environment & config
+# ----------------------------------------
+.env
+.env.local
+.env.*.local
+*.envrc
+
+# Mantenha apenas o modelo de exemplo versionado
+!env.example
+
+# ----------------------------------------
+# IDE & editor settings
+# ----------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----------------------------------------
+# Logs & temporary files
+# ----------------------------------------
+*.log
+*.pid
+*.seed
+*.bak
+*.tmp
+
+# ----------------------------------------
+# OS-generated files
+# ----------------------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------------------
+# Docker
+# (sem volumes locais de banco, pois usa Supabase remoto)
+nats-data/
+redis-data/
+
+# ----------------------------------------
+# Test & coverage
+# ----------------------------------------
+coverage/
+test-results/
+*.prof
+*.cov
+*.coverprofile
+
+# ----------------------------------------
+# GraphQL (arquivos gerados automaticamente)
+# ----------------------------------------
+graph/generated/
+graph/model/
+

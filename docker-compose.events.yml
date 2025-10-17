@@ -12,6 +12,9 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
       - NATS_URL=nats://nats:4222
+      # Adicione suas variáveis de conexão Supabase (via .env)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     networks:
       - cheater-backend-network
 
@@ -40,20 +43,6 @@ services:
     networks:
       - cheater-backend-network
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: cheater-backend-postgres
-    environment:
-      POSTGRES_DB: cheater-backend
-      POSTGRES_USER: cheater-backend
-      POSTGRES_PASSWORD: cheater-backend
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - cheater-backend-network
-
   nats-box:
     image: natsio/nats-box:latest
     container_name: cheater-backend-nats-box
@@ -68,8 +57,8 @@ services:
 volumes:
   nats-data:
   redis-data:
-  postgres-data:
 
 networks:
   cheater-backend-network:
     driver: bridge
+

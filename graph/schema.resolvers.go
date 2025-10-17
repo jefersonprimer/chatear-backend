@@ -10,12 +10,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/graph/model"
-	userApp "github.com/jefersonprimer/chatear-backend/internal/user/application"
+	"github.com/jefersonprimer/chatear-backend/presentation/http"
+	"github.com/jefersonprimer/chatear-backend/shared/auth"
 )
 
 // RegisterUser is the resolver for the registerUser field.
 func (r *mutationResolver) RegisterUser(ctx context.Context, input model.RegisterUserInput) (*model.AuthResponse, error) {
-	authTokens, user, err := r.Resolver.UserAppService.Register(ctx, input.Email, input.Password)
+	authTokens, user, err := r.Resolver.UserAppService.Register(ctx, input.Name, input.Email, input.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,17 @@ func (r *mutationResolver) RegisterUser(ctx context.Context, input model.Registe
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthResponse, error) {
-	authTokens, user, err := r.Resolver.UserAppService.Login(ctx, input.Email, input.Password)
+	ginCtx, ok := http.GinContextFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("gin context not found")
+	}
+	loginResponse, err := r.Resolver.UserAppService.Login(ctx, input.Email, input.Password, ginCtx.ClientIP(), ginCtx.Request.UserAgent())
+	if err != nil {
+		return nil, err
+	}
+
+	// This part is duplicated, I should refactor it later
+	user, err := r.Resolver.UserAppService.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +93,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		modelUser.LastLoginAt = &lastLoginAtStr
 	}
 
-	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
+	return &model.AuthResponse{User: modelUser, AccessToken: loginResponse.AccessToken, RefreshToken: loginResponse.RefreshToken}, nil
 }
 
 // Logout is the resolver for the logout field.
@@ -120,7 +131,7 @@ func (r *mutationResolver) DeleteAccount(ctx context.Context, input model.Delete
 	}
 
 	// Assuming password is not required for GraphQL mutation, or handled by separate auth
-	err = r.Resolver.UserAppService.DeleteAccount(ctx, userID, "") // Empty string for password
+	err = r.Resolver.UserAppService.DeleteAccount(ctx, userID)
 	if err != nil {
 		return false, err
 	}
@@ -128,39 +139,13 @@ func (r *mutationResolver) DeleteAccount(ctx context.Context, input model.Delete
 }
 
 // RecoverAccount is the resolver for the recoverAccount field.
-func (r *mutationResolver) RecoverAccount(ctx context.Context, input model.RecoverAccountInput) (*model.AuthResponse, error) {
-	authTokens, user, err := r.Resolver.UserAppService.RecoverAccount(ctx, input.Token, input.NewPassword)
+func (r *mutationResolver) RecoverAccount(ctx context.Context, input model.RecoverAccountInput) (bool, error) {
+	_, _, err := r.Resolver.UserAppService.RecoverAccount(ctx, input.Token, input.NewPassword)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
-	modelUser := &model.User{
-		ID:              user.ID.String(),
-		Name:            user.Name,
-		Email:           user.Email,
-		CreatedAt:       user.CreatedAt.String(),
-		UpdatedAt:       user.UpdatedAt.String(),
-		IsEmailVerified: user.IsEmailVerified,
-		IsDeleted:       user.IsDeleted,
-	}
-
-	if user.DeletedAt != nil {
-		deletedAtStr := user.DeletedAt.String()
-		modelUser.DeletedAt = &deletedAtStr
-	}
-	if user.AvatarURL != nil {
-		modelUser.AvatarURL = user.AvatarURL
-	}
-	if user.DeletionDueAt != nil {
-		deletionDueAtStr := user.DeletionDueAt.String()
-		modelUser.DeletionDueAt = &deletionDueAtStr
-	}
-	if user.LastLoginAt != nil {
-		lastLoginAtStr := user.LastLoginAt.String()
-		modelUser.LastLoginAt = &lastLoginAtStr
-	}
-
-	return &model.AuthResponse{User: modelUser, AccessToken: authTokens.AccessToken, RefreshToken: authTokens.RefreshToken}, nil
+	return true, nil
 }
 
 // VerifyEmail is the resolver for the verifyEmail field.

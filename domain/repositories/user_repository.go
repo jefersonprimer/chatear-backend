@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/domain/entities"
@@ -9,12 +10,11 @@ import (
 
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
-	Create(ctx context.Context, user *entities.User) error
-	GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
-	GetByEmail(ctx context.Context, email string) (*entities.User, error)
-	Update(ctx context.Context, user *entities.User) error
-	Delete(ctx context.Context, id uuid.UUID) error
-	GetDeletedUsers(ctx context.Context, limit, offset int) ([]*entities.User, error)
-	GetByEmailVerified(ctx context.Context, verified bool, limit, offset int) ([]*entities.User, error)
-	SearchByName(ctx context.Context, name string, limit, offset int) ([]*entities.User, error)
+	CreateUser(ctx context.Context, user *entities.User) error
+	GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*entities.User, error)
+	UpdateUser(ctx context.Context, user *entities.User) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
+	GetSoftDeletedUsers(ctx context.Context, retentionPeriod time.Duration) ([]*entities.User, error)
+	HardDeleteUser(ctx context.Context, id uuid.UUID) error
 }

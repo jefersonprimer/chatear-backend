@@ -19,6 +19,8 @@ type RefreshToken struct {
 	CreatedAt time.Time  `json:"created_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 	Revoked   bool       `json:"revoked"`
+	IPAddress string     `json:"ip_address"`
+	UserAgent string     `json:"user_agent"`
 }
 
 // RefreshTokenRepository defines the interface for managing refresh tokens.

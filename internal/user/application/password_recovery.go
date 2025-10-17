@@ -1,3 +1,5 @@
+package application
+
 import (
 	"context"
 	"encoding/json"
@@ -15,14 +17,16 @@ type PasswordRecovery struct {
 	UserRepository  domain.UserRepository
 	TokenRepository infrastructure.TokenRepository
 	EventBus        domain.EventBus
+	AppURL          string
 }
 
 // NewPasswordRecovery creates a new PasswordRecovery use case.
-func NewPasswordRecovery(userRepository domain.UserRepository, tokenRepository infrastructure.TokenRepository, eventBus domain.EventBus) *PasswordRecovery {
+func NewPasswordRecovery(userRepository domain.UserRepository, tokenRepository infrastructure.TokenRepository, eventBus domain.EventBus, appURL string) *PasswordRecovery {
 	return &PasswordRecovery{
 		UserRepository:  userRepository,
 		TokenRepository: tokenRepository,
 		EventBus:        eventBus,
+		AppURL:          appURL,
 	}
 }
 
@@ -45,7 +49,7 @@ func (uc *PasswordRecovery) Execute(ctx context.Context, email string) error {
 	emailRequest := events.EmailSendRequest{
 		Recipient: user.Email,
 		Subject:   "Password Reset",
-		Body:      fmt.Sprintf("Click here to reset your password: http://localhost:8080/reset-password?token=%s", token),
+		Body:      fmt.Sprintf("Click here to reset your password: %s/reset-password?token=%s", uc.AppURL, token),
 	}
 	emailDataBytes, err := json.Marshal(emailRequest)
 	if err != nil {

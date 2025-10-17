@@ -3,44 +3,34 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 
+	"github.com/jefersonprimer/chatear-backend/config"
 	"github.com/jefersonprimer/chatear-backend/infrastructure"
 	notification_app "github.com/jefersonprimer/chatear-backend/internal/notification/application"
 	notification_infra "github.com/jefersonprimer/chatear-backend/internal/notification/infrastructure"
 	"github.com/jefersonprimer/chatear-backend/internal/notification/worker"
-	"github.com/jefersonprimer/chatear-backend/shared/events"
-	"github.com/joho/godotenv"
 )
+
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Error loading .env file, using environment variables")
-	}
+	cfg := config.LoadConfig()
 
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL environment variable not set")
-	}
-
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
+	if cfg.RedisURL == "" {
 		log.Fatal("REDIS_URL environment variable not set")
 	}
 
-	natsURL := os.Getenv("NATS_URL")
-	if natsURL == "" {
+	if cfg.NatsURL == "" {
 		log.Fatal("NATS_URL environment variable not set")
 	}
 
-	infra, err := infrastructure.NewInfrastructure(databaseURL, redisURL, natsURL)
+	infra, err := infrastructure.NewInfrastructure(cfg.SupabaseURL, cfg.SupabaseAnonKey, cfg.RedisURL, cfg.NatsURL)
 	if err != nil {
 		log.Fatalf("Error initializing infrastructure: %v", err)
 	}
 	defer infra.Close()
 
-	notificationRepository := notification_infra.NewPostgresRepository(infra.Postgres)
-	smtpSender, err := notification_infra.NewSMTPSender()
+	// notificationRepository := notification_infra.NewPostgresRepository(infra.Postgres)
+	var notificationRepository notification_app.EmailSendRepository
+	smtpSender, err := notification_infra.NewSMTPSender(cfg)
 	if err != nil {
 		log.Fatalf("Error creating SMTP sender: %v", err)
 	}

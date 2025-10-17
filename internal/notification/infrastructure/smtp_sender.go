@@ -9,25 +9,26 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jefersonprimer/chatear-backend/config"
 	"github.com/jefersonprimer/chatear-backend/internal/notification/domain"
 )
 
 type SMTPSender struct {
 	host          string
-	port          string
+	port          int
 	user          string
 	password      string
 	from          string
 	templates     map[string]*template.Template
 }
 
-func NewSMTPSender() (*SMTPSender, error) {
+func NewSMTPSender(cfg *config.Config) (*SMTPSender, error) {
 	templates := make(map[string]*template.Template)
-	
+
 	// Load all templates from the templates directory
 	templateDir := "internal/notification/infrastructure/templates"
 	templateFiles := []string{"email.txt", "welcome.html", "magic_link.html"}
-	
+
 	for _, templateFile := range templateFiles {
 		templatePath := filepath.Join(templateDir, templateFile)
 		if _, err := os.Stat(templatePath); err == nil {
@@ -41,20 +42,21 @@ func NewSMTPSender() (*SMTPSender, error) {
 	}
 
 	return &SMTPSender{
-		host:          os.Getenv("SMTP_HOST"),
-		port:          os.Getenv("SMTP_PORT"),
-		user:          os.Getenv("SMTP_USER"),
-		password:      os.Getenv("SMTP_PASS"), // Fixed: use SMTP_PASS instead of SMTP_PASSWORD
-		from:          os.Getenv("SMTP_FROM"),
+		host:          cfg.SMTPHost,
+		port:          cfg.SMTPPort,
+		user:          cfg.SMTPUser,
+		password:      cfg.SMTPPass,
+		from:          cfg.SMTPFrom,
 		templates:     templates,
-	}, nil
+	},
+il
 }
 
 func (s *SMTPSender) Send(ctx context.Context, emailSend *domain.EmailSend) error {
 	auth := smtp.PlainAuth("", s.user, s.password, s.host)
 
 	var body bytes.Buffer
-	
+
 	// Use template if specified, otherwise use the body directly
 	if emailSend.TemplateName != "" {
 		if template, exists := s.templates[emailSend.TemplateName]; exists {
@@ -81,7 +83,7 @@ func (s *SMTPSender) Send(ctx context.Context, emailSend *domain.EmailSend) erro
 		"\r\n" +
 		body.String() + "\r\n")
 
-	addr := fmt.Sprintf("%s:%s", s.host, s.port)
+	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 
 	return smtp.SendMail(addr, auth, s.from, []string{emailSend.Recipient}, msg)
 }

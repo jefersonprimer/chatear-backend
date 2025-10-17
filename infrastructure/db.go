@@ -3,49 +3,14 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jefersonprimer/chatear-backend/infrastructure/db/postgres"
 	"github.com/nats-io/nats.go"
+	"github.com/supabase-community/supabase-go/supabase"
 )
 
-// DB holds the database connection pool.
-// Deprecated: Use postgres.Adapter instead
-type DB struct {
-	Pool *pgxpool.Pool
-}
-
-// NewDB creates a new database connection.
-// Deprecated: Use postgres.NewAdapter instead
-func NewDB(databaseURL string) (*DB, error) {
-	pool, err := pgxpool.New(context.Background(), databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create connection pool: %w", err)
-	}
-
-	return &DB{Pool: pool}, nil
-}
-
-// Close closes the database connection.
-func (db *DB) Close() {
-	db.Pool.Close()
-}
-
-// RunMigrations runs the database migrations.
-// Deprecated: Use postgres.Adapter.RunMigrations instead
-func (db *DB) RunMigrations(migrationsPath string) error {
-	// For now, we'll just log that we're running migrations.
-	// In a real application, you would use a library like golang-migrate/migrate.
-	fmt.Printf("Running migrations from %s\n", migrationsPath)
-	return nil
-}
-
-// NewPostgresAdapter creates a new PostgreSQL database adapter
-func NewPostgresAdapter(databaseURL string) (*postgres.Adapter, error) {
-	return postgres.NewAdapter(databaseURL)
-}
 
 // NewRedisClient creates a new Redis client
 func NewRedisClient(redisURL string) (*redis.Client, error) {
@@ -74,30 +39,38 @@ func NewNatsClient(natsURL string) (*nats.Conn, error) {
 
 // Infrastructure holds all infrastructure components
 type Infrastructure struct {
-	Postgres *postgres.Adapter
+	Supabase *supabase.Client
 	Redis    *redis.Client
 	NatsConn *nats.Conn
 }
 
 // NewInfrastructure creates and initializes all infrastructure components
-func NewInfrastructure(databaseURL, redisURL, natsURL string) (*Infrastructure, error) {
-	pgAdapter, err := NewPostgresAdapter(databaseURL)
+func NewInfrastructure(supabaseURL, supabaseAnonKey, redisURL, natsURL string) (*Infrastructure, error) {
+	var supabaseClient *supabase.Client
+	var redisClient *redis.Client
+	var natsConn *nats.Conn
+	var err error
+
+	supabaseClient, err = supabase.NewClient(supabaseURL, supabaseAnonKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create postgres adapter: %w", err)
+		log.Printf("Failed to create Supabase client: %v", err)
+		supabaseClient = nil
 	}
 
-	redisClient, err := NewRedisClient(redisURL)
+	redisClient, err = NewRedisClient(redisURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create redis client: %w", err)
+		log.Printf("Failed to create redis client: %v", err)
+		redisClient = nil
 	}
 
-	natsConn, err := NewNatsClient(natsURL)
+	natsConn, err = NewNatsClient(natsURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create nats client: %w", err)
+		log.Printf("Failed to create nats client: %v", err)
+		natsConn = nil
 	}
 
 	return &Infrastructure{
-		Postgres: pgAdapter,
+		Supabase: supabaseClient,
 		Redis:    redisClient,
 		NatsConn: natsConn,
 	},
@@ -106,9 +79,6 @@ func NewInfrastructure(databaseURL, redisURL, natsURL string) (*Infrastructure, 
 
 // Close closes all infrastructure connections
 func (i *Infrastructure) Close() {
-	if i.Postgres != nil {
-		i.Postgres.Close()
-	}
 	if i.Redis != nil {
 		i.Redis.Close()
 	}

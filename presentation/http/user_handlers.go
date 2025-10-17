@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	
 	"github.com/jefersonprimer/chatear-backend/internal/user/application"
 	"github.com/jefersonprimer/chatear-backend/shared/auth"
 )
@@ -60,7 +60,10 @@ func (h *UserHandlers) Login(c *gin.Context) {
 		return
 	}
 
-	authTokens, user, err := h.userService.Login(c.Request.Context(), req.Email, req.Password)
+	ipAddress := c.ClientIP()
+	userAgent := c.Request.UserAgent()
+
+	loginResponse, err := h.userService.Login(c.Request.Context(), req.Email, req.Password, ipAddress, userAgent)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -68,9 +71,8 @@ func (h *UserHandlers) Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Logged in successfully",
-		"access_token":  authTokens.AccessToken,
-		"refresh_token": authTokens.RefreshToken,
-		"user":          user,
+		"access_token":  loginResponse.AccessToken,
+		"refresh_token": loginResponse.RefreshToken,
 	})
 }
 
@@ -101,27 +103,24 @@ func (h *UserHandlers) Logout(c *gin.Context) {
 
 // RefreshToken handles POST /refresh-token
 func (h *UserHandlers) RefreshToken(c *gin.Context) {
-	var req struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
-	}
+	// Implementation for refreshing a token
+}
 
+func (h *UserHandlers) ResendVerificationEmail(c *gin.Context) {
+	var req struct {
+		Email string `json:"email"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	authTokens, user, err := h.userService.RefreshToken(c.Request.Context(), req.RefreshToken)
-		if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	if err := h.userService.ResendVerificationEmail(c.Request.Context(), req.Email); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "Token refreshed successfully",
-		"access_token":  authTokens.AccessToken,
-		"refresh_token": authTokens.RefreshToken,
-		"user":          user,
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
 }
 
 // VerifyEmail handles GET /verify-email

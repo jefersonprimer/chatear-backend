@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
-	"github.com/jefersonprimer/chatear-backend/shared/auth"
+	"github.com/jefersonprimer/chatear-backend/internal/user/infrastructure"
+	
 )
 
 // UserApplicationService encapsulates user-related application logic.
@@ -17,9 +19,13 @@ type UserApplicationService struct {
 	eventBus           domain.EventBus
 	tokenRepo          infrastructure.TokenRepository
 	emailRepo          domain.EmailRepository
-	tokenService       *auth.TokenService
+	tokenService       domain.TokenService
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
+	appURL             string
+	maxEmailsPerDay    int
+	userDeletionRepo   domain.UserDeletionRepository
+	deletionCapacityRepo domain.DeletionCapacityRepository
 }
 
 // NewUserApplicationService creates a new UserApplicationService.
@@ -30,9 +36,13 @@ func NewUserApplicationService(
 	eventBus domain.EventBus,
 	tokenRepo infrastructure.TokenRepository,
 	emailRepo domain.EmailRepository,
-	tokenService *auth.TokenService,
+	tokenService domain.TokenService,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
+	appURL string,
+	maxEmailsPerDay int,
+	userDeletionRepo domain.UserDeletionRepository,
+	deletionCapacityRepo domain.DeletionCapacityRepository,
 ) *UserApplicationService {
 	return &UserApplicationService{
 		userRepo:           userRepo,
@@ -44,24 +54,26 @@ func NewUserApplicationService(
 		tokenService:       tokenService,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
+		appURL:             appURL,
+		maxEmailsPerDay:    maxEmailsPerDay,
+		userDeletionRepo:   userDeletionRepo,
+		deletionCapacityRepo: deletionCapacityRepo,
 	}
 }
 
-// Register registers a new user.
 func (s *UserApplicationService) Register(ctx context.Context, name, email, password string) (*AuthTokens, *domain.User, error) {
-	registerUserUseCase := NewRegisterUser(s.userRepo, s.emailRepo, s.tokenRepo, s.eventBus)
+	registerUserUseCase := NewRegisterUser(s.userRepo, s.emailRepo, s.tokenRepo, s.eventBus, s.appURL, s.maxEmailsPerDay)
 	user, err := registerUserUseCase.Execute(ctx, name, email, password)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to register user: %w", err)
 	}
 
-	// Generate tokens
-	accessToken, err := auth.GenerateAccessToken(user.ID.String())
+	accessToken, err := s.tokenService.CreateAccessToken(ctx, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshTokenString, err := auth.GenerateRefreshToken()
+	refreshTokenString, err := s.tokenService.CreateRefreshToken(ctx, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate refresh token string: %w", err)
 	}
@@ -74,7 +86,7 @@ func (s *UserApplicationService) Register(ctx context.Context, name, email, pass
 		CreatedAt: time.Now(),
 	}
 
-	if err := s.refreshTokenRepo.Save(refreshToken); err != nil {
+	if err := s.refreshTokenRepo.CreateRefreshToken(ctx, refreshToken); err != nil {
 		return nil, nil, fmt.Errorf("failed to save refresh token: %w", err)
 	}
 
@@ -82,66 +94,23 @@ func (s *UserApplicationService) Register(ctx context.Context, name, email, pass
 }
 
 // Login logs in a user.
-func (s *UserApplicationService) Login(ctx context.Context, email, password string) (*AuthTokens, *domain.User, error) {
-	loginUseCase := NewLogin(s.userRepo)
-	user, err := loginUseCase.Execute(ctx, email, password)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to login user: %w", err)
-	}
-
-	accessToken, err := auth.GenerateAccessToken(user.ID.String())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate access token: %w", err)
-	}
-
-	refreshTokenString, err := auth.GenerateRefreshToken()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate refresh token string: %w", err)
-	}
-
-	refreshToken := &domain.RefreshToken{
-		ID:        uuid.New(),
-		UserID:    user.ID,
-		Token:     refreshTokenString,
-		ExpiresAt: time.Now().Add(s.refreshTokenDuration),
-		CreatedAt: time.Now(),
-	}
-
-	if err := s.refreshTokenRepo.Save(refreshToken); err != nil {
-		return nil, nil, fmt.Errorf("failed to save refresh token: %w", err)
-	}
-
-	return &AuthTokens{AccessToken: accessToken, RefreshToken: refreshTokenString}, user, nil
+func (s *UserApplicationService) Login(ctx context.Context, email, password, ipAddress, userAgent string) (*LoginResponse, error) {
+	loginUseCase := NewLoginUser(s.userRepo, s.refreshTokenRepo, s.tokenService)
+	return loginUseCase.Execute(ctx, email, password, ipAddress, userAgent)
 }
 
-// Logout logs out a user.
 func (s *UserApplicationService) Logout(ctx context.Context, accessToken string, refreshToken string) error {
 	// Blacklist the access token
 	if accessToken != "" {
-		claims, err := auth.ValidateAccessToken(accessToken)
+		userID, err := s.tokenService.VerifyToken(ctx, accessToken)
 		if err != nil {
 			// Log the error but don't fail the logout process if access token is invalid
 			fmt.Printf("Warning: Failed to validate access token during logout: %v\n", err)
 		} else {
-			expiration := claims.ExpiresAt.Sub(time.Now())
-			if expiration > 0 {
-				err := s.blacklistRepo.Add(ctx, accessToken, expiration)
-				if err != nil {
-					return fmt.Errorf("failed to blacklist access token: %w", err)
-				}
+			if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+				return fmt.Errorf("failed to revoke all refresh tokens for user: %w", err)
 			}
 		}
-	}
-
-	// Find the refresh token in the database
-	dbRefreshToken, err := s.refreshTokenRepo.FindByToken(refreshToken)
-	if err != nil {
-		return fmt.Errorf("failed to find refresh token for logout: %w", err)
-	}
-
-	// Revoke the refresh token
-	if err := s.refreshTokenRepo.Revoke(dbRefreshToken.ID); err != nil {
-		return fmt.Errorf("failed to revoke refresh token: %w", err)
 	}
 
 	return nil
@@ -149,30 +118,34 @@ func (s *UserApplicationService) Logout(ctx context.Context, accessToken string,
 
 // RecoverPassword initiates password recovery.
 func (s *UserApplicationService) RecoverPassword(ctx context.Context, email string) error {
-	recoverPasswordUseCase := NewRecoverPassword(s.userRepo, s.eventBus)
+	recoverPasswordUseCase := NewPasswordRecovery(s.userRepo, s.tokenRepo, s.eventBus, s.appURL)
 	return recoverPasswordUseCase.Execute(ctx, email)
 }
 
-// DeleteAccount deletes a user account.
-func (s *UserApplicationService) DeleteAccount(ctx context.Context, userID uuid.UUID, password string) error {
-	deleteUserUseCase := NewDeleteUser(s.userRepo, s.eventBus)
-	return deleteUserUseCase.Execute(ctx, userID, password)
+func (s *UserApplicationService) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
+	deleteUserUseCase := NewDeleteUser(s.userRepo, s.userDeletionRepo, s.deletionCapacityRepo, s.eventBus)
+	return deleteUserUseCase.Execute(ctx, userID)
 }
 
 // RecoverAccount recovers a user account with a token and new password.
 func (s *UserApplicationService) RecoverAccount(ctx context.Context, token, newPassword string) (*AuthTokens, *domain.User, error) {
-	recoverAccountUseCase := NewVerifyTokenAndResetPassword(s.userRepo, s.eventBus)
+	recoverAccountUseCase := NewVerifyTokenAndResetPassword(s.userRepo, s.tokenRepo)
 	user, err := recoverAccountUseCase.Execute(ctx, token, newPassword)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	accessToken, err := auth.GenerateAccessToken(user.ID.String())
+	// Revoke all refresh tokens for the user
+	if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, user.ID); err != nil {
+		return nil, nil, fmt.Errorf("failed to revoke all refresh tokens for user: %w", err)
+	}
+
+	accessToken, err := s.tokenService.CreateAccessToken(ctx, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshTokenString, err := auth.GenerateRefreshToken()
+	refreshTokenString, err := s.tokenService.CreateRefreshToken(ctx, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate refresh token string: %w", err)
 	}
@@ -185,7 +158,7 @@ func (s *UserApplicationService) RecoverAccount(ctx context.Context, token, newP
 		CreatedAt: time.Now(),
 	}
 
-	if err := s.refreshTokenRepo.Save(refreshToken); err != nil {
+	if err := s.refreshTokenRepo.CreateRefreshToken(ctx, refreshToken); err != nil {
 		return nil, nil, fmt.Errorf("failed to save refresh token: %w", err)
 	}
 
@@ -197,11 +170,24 @@ func (s *UserApplicationService) GetUserByID(ctx context.Context, userID uuid.UU
 	return s.userRepo.GetUserByID(ctx, userID)
 }
 
+// GetUserByEmail retrieves a user by their email.
+func (s *UserApplicationService) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	return s.userRepo.GetUserByEmail(ctx, email)
+}
+
 func (s *UserApplicationService) RefreshToken(ctx context.Context, refreshTokenString string) (*AuthTokens, *domain.User, error) {
 	// Validate the refresh token
-	refreshToken, err := s.tokenService.ValidateRefreshToken(ctx, refreshTokenString)
+	refreshToken, err := s.refreshTokenRepo.GetRefreshTokenByToken(ctx, refreshTokenString)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	if refreshToken.Revoked {
+		return nil, nil, fmt.Errorf("refresh token has been revoked")
+	}
+
+	if refreshToken.ExpiresAt.Before(time.Now()) {
+		return nil, nil, fmt.Errorf("refresh token has expired")
 	}
 
 	// Get the user associated with the refresh token
@@ -211,18 +197,18 @@ func (s *UserApplicationService) RefreshToken(ctx context.Context, refreshTokenS
 	}
 
 	// Revoke the old refresh token
-	if err := s.refreshTokenRepo.Revoke(refreshToken.ID); err != nil {
+	if err := s.refreshTokenRepo.RevokeRefreshToken(ctx, refreshToken.ID); err != nil {
 		return nil, nil, fmt.Errorf("failed to revoke old refresh token: %w", err)
 	}
 
 	// Generate a new access token
-	newAccessToken, err := s.tokenService.GenerateAccessToken(user.ID.String())
+	newAccessToken, err := s.tokenService.CreateAccessToken(ctx, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate new access token: %w", err)
 	}
 
 	// Generate a new refresh token
-	newRefreshTokenString, err := s.tokenService.GenerateRefreshToken()
+	newRefreshTokenString, err := s.tokenService.CreateRefreshToken(ctx, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate new refresh token string: %w", err)
 	}
@@ -235,7 +221,7 @@ func (s *UserApplicationService) RefreshToken(ctx context.Context, refreshTokenS
 		CreatedAt: time.Now(),
 	}
 
-	if err := s.refreshTokenRepo.Save(newRefreshToken); err != nil {
+	if err := s.refreshTokenRepo.CreateRefreshToken(ctx, newRefreshToken); err != nil {
 		return nil, nil, fmt.Errorf("failed to save new refresh token: %w", err)
 	}
 
@@ -246,6 +232,12 @@ func (s *UserApplicationService) RefreshToken(ctx context.Context, refreshTokenS
 func (s *UserApplicationService) VerifyEmail(ctx context.Context, token string) error {
 	verifyTokenUseCase := NewVerifyToken(s.userRepo, s.tokenRepo) // Assuming s.tokenRepo exists
 	return verifyTokenUseCase.Execute(ctx, token, "verification")
+}
+
+// ResendVerificationEmail resends the verification email.
+func (s *UserApplicationService) ResendVerificationEmail(ctx context.Context, email string) error {
+	resendVerificationEmailUseCase := NewResendVerificationEmail(s.userRepo, s.emailRepo, s.tokenRepo, s.eventBus, s.appURL, s.maxEmailsPerDay)
+	return resendVerificationEmailUseCase.Execute(ctx, email)
 }
 
 // AuthTokens struct to return access and refresh tokens

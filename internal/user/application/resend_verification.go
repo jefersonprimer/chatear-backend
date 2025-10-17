@@ -12,13 +12,10 @@ import (
 	"github.com/jefersonprimer/chatear-backend/internal/user/infrastructure"
 	"github.com/jefersonprimer/chatear-backend/shared/events"
 	"github.com/jefersonprimer/chatear-backend/shared/util"
-	"golang.org/x/crypto/bcrypt"
 )
 
-const defaultMaxEmailsPerDay = 2
-
-// RegisterUser is a use case for registering a new user.
-type RegisterUser struct {
+// ResendVerificationEmail is a use case for resending the verification email.
+type ResendVerificationEmail struct {
 	UserRepository  domain.UserRepository
 	EmailRepository domain.EmailRepository
 	TokenRepository infrastructure.TokenRepository
@@ -27,12 +24,12 @@ type RegisterUser struct {
 	MaxEmailsPerDay int
 }
 
-// NewRegisterUser creates a new RegisterUser use case.
-func NewRegisterUser(userRepository domain.UserRepository, emailRepository domain.EmailRepository, tokenRepository infrastructure.TokenRepository, eventBus domain.EventBus, appURL string, maxEmailsPerDay int) *RegisterUser {
+// NewResendVerificationEmail creates a new ResendVerificationEmail use case.
+func NewResendVerificationEmail(userRepository domain.UserRepository, emailRepository domain.EmailRepository, tokenRepository infrastructure.TokenRepository, eventBus domain.EventBus, appURL string, maxEmailsPerDay int) *ResendVerificationEmail {
 	if maxEmailsPerDay == 0 {
 		maxEmailsPerDay = defaultMaxEmailsPerDay
 	}
-	return &RegisterUser{
+	return &ResendVerificationEmail{
 		UserRepository:  userRepository,
 		EmailRepository: emailRepository,
 		TokenRepository: tokenRepository,
@@ -42,40 +39,33 @@ func NewRegisterUser(userRepository domain.UserRepository, emailRepository domai
 	}
 }
 
-// Execute registers a new user and sends a verification email.
-func (uc *RegisterUser) Execute(ctx context.Context, name, email, password string) (*domain.User, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+// Execute finds a user by email, generates a new verification token, and sends it.
+func (uc *ResendVerificationEmail) Execute(ctx context.Context, email string) error {
+	user, err := uc.UserRepository.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, err
+		return errors.New("user not found")
 	}
 
-	user := &domain.User{
-		ID:           uuid.New(),
-		Name:         name,
-		Email:        email,
-		PasswordHash: string(hashedPassword),
-	}
-
-	if err := uc.UserRepository.CreateUser(ctx, user); err != nil {
-		return nil, err
+	if user.IsEmailVerified {
+		return errors.New("email already verified")
 	}
 
 	emails, err := uc.EmailRepository.GetEmailsByUserIDAndType(ctx, user.ID, "verification")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(emails) >= uc.MaxEmailsPerDay {
-		return nil, errors.New("email limit exceeded")
+		return errors.New("email limit exceeded")
 	}
 
 	token, err := util.GenerateRandomToken()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := uc.TokenRepository.Set(ctx, fmt.Sprintf("verification:%s", token), user.ID.String(), 15*time.Minute); err != nil {
-		return nil, err
+		return err
 	}
 
 	emailRequest := events.EmailSendRequest{
@@ -85,33 +75,16 @@ func (uc *RegisterUser) Execute(ctx context.Context, name, email, password strin
 	}
 	emailDataBytes, err := json.Marshal(emailRequest)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := uc.EventBus.Publish(ctx, &domain.Event{Subject: "email.send", Data: emailDataBytes}); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := uc.EmailRepository.CreateEmail(ctx, &domain.Email{ID: uuid.New(), UserID: user.ID, Type: "verification"}); err != nil {
-		return nil, err
+		return err
 	}
 
-	// Publish audit event
-	auditEvent := events.UserRegisteredEvent{
-		UserID:    user.ID.String(),
-		Email:     user.Email,
-		Timestamp: time.Now(),
-	}
-	auditEventBytes, err := json.Marshal(auditEvent)
-	if err != nil {
-		// Log the error but don't fail the registration process
-		fmt.Printf("Warning: Failed to marshal audit event: %v\n", err)
-	} else {
-		if err := uc.EventBus.Publish(ctx, &domain.Event{Subject: "user.registered", Data: auditEventBytes}); err != nil {
-			// Log the error but don't fail the registration process
-			fmt.Printf("Warning: Failed to publish audit event: %v\n", err)
-		}
-	}
-
-	return user, nil
+	return nil
 }

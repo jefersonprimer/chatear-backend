@@ -32,25 +32,9 @@ func AuthMiddleware(tokenService *TokenService, blacklistRepo userDomain.Blackli
 			tokenString = tokenString[7:]
 		}
 
-		claims, err := tokenService.ValidateAccessToken(tokenString)
+		userID, err := tokenService.VerifyToken(c.Request.Context(), tokenString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			return
-		}
-
-		isBlacklisted, err := blacklistRepo.Check(c.Request.Context(), tokenString)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to check token blacklist"})
-			return
-		}
-		if isBlacklisted {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token has been revoked"})
-			return
-		}
-
-		userID, err := uuid.Parse(claims.UserID)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in token"})
 			return
 		}
 

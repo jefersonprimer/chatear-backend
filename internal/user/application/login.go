@@ -2,10 +2,12 @@ package application
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
+	
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -32,7 +34,7 @@ type LoginResponse struct {
 }
 
 // Execute logs in a user and returns an access token and a refresh token.
-func (uc *LoginUser) Execute(ctx context.Context, email, password string) (*LoginResponse, error) {
+func (uc *LoginUser) Execute(ctx context.Context, email, password, ipAddress, userAgent string) (*LoginResponse, error) {
 	user, err := uc.UserRepository.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -40,6 +42,14 @@ func (uc *LoginUser) Execute(ctx context.Context, email, password string) (*Logi
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, err
+	}
+
+	if !user.IsEmailVerified {
+		return nil, errors.New("email not verified")
+	}
+
+	if user.IsDeleted {
+		return nil, errors.New("user is deleted")
 	}
 
 	accessToken, err := uc.TokenService.CreateAccessToken(ctx, user)
@@ -59,6 +69,8 @@ func (uc *LoginUser) Execute(ctx context.Context, email, password string) (*Logi
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		CreatedAt: time.Now(),
 		Revoked:   false,
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	}
 
 	if err := uc.RefreshTokenRepository.CreateRefreshToken(ctx, refreshTokenEntity); err != nil {

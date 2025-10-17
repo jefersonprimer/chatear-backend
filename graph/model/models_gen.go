@@ -32,6 +32,10 @@ type RecoverPasswordInput struct {
 	Email string `json:"email"`
 }
 
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
 type RegisterUserInput struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
@@ -50,4 +54,8 @@ type User struct {
 	DeletionDueAt   *string `json:"deletionDueAt,omitempty"`
 	LastLoginAt     *string `json:"lastLoginAt,omitempty"`
 	IsDeleted       bool    `json:"isDeleted"`
+}
+
+type VerifyEmailInput struct {
+	Token string `json:"token"`
 }

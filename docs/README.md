@@ -17,7 +17,7 @@ This is the backend service for the Chatear application, built with Go. It provi
 Before you begin, ensure you have the following installed:
 
 *   **Go**: Version 1.25.3 or higher.
-*   **PostgreSQL**: A running PostgreSQL instance for data persistence.
+*   **Supabase**: A running Supabase instance for data persistence.
 *   **Redis**: A running Redis instance for caching, session management, and rate limiting.
 *   **NATS**: A running NATS server for inter-service communication and event streaming.
 

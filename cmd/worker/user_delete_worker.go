@@ -4,19 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"os"
 	"time"
 
+	"github.com/jefersonprimer/chatear-backend/config"
 	"github.com/jefersonprimer/chatear-backend/infrastructure"
 	notification_app "github.com/jefersonprimer/chatear-backend/internal/notification/application"
 	notification_infra "github.com/jefersonprimer/chatear-backend/internal/notification/infrastructure"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
-	"github.com/joho/godotenv"
 )
 
 const (
-	natsURL         = "NATS_URL" // Replace with actual environment variable or config
 	subjectUserDelete = "user.delete"
 	deletionWarningPeriod = 24 * time.Hour // 24 hours before actual deletion
 
@@ -33,43 +31,32 @@ type UserDeleteEvent struct {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Error loading .env file, using environment variables")
-	}
+	cfg := config.LoadConfig()
 
 	// Initialize NATS connection
-	natsURL := os.Getenv("NATS_URL")
-	if natsURL == "" {
+	if cfg.NatsURL == "" {
 		log.Fatal("NATS_URL environment variable not set")
 	}
-	nc, err := nats.Connect(natsURL)
+	nc, err := nats.Connect(cfg.NatsURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to NATS: %v", err)
 	}
 	defer nc.Close()
 
-	log.Printf("Connected to NATS at %s", natsURL)
+	log.Printf("Connected to NATS at %s", cfg.NatsURL)
 
 	// Initialize database connection
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL environment variable not set")
-	}
-	db, err := infrastructure.NewDB(databaseURL)
+	infra, err := infrastructure.NewInfrastructure(cfg.SupabaseURL, cfg.SupabaseAnonKey, cfg.RedisURL, cfg.NatsURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Error initializing infrastructure: %v", err)
 	}
-	defer db.Close()
-
-	log.Println("Connected to PostgreSQL database")
+	defer infra.Close()
 
 	// Initialize Redis client
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
+	if cfg.RedisURL == "" {
 		log.Fatal("REDIS_URL environment variable not set")
 	}
-	redisOpt, err := redis.ParseURL(redisURL)
+	redisOpt, err := redis.ParseURL(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("Failed to parse Redis URL: %v", err)
 	}
@@ -83,8 +70,9 @@ func main() {
 	log.Println("Connected to Redis")
 
 	// Initialize notification services for sending recovery emails
-	notificationRepository := notification_infra.NewPostgresRepository(db)
-	smtpSender, err := notification_infra.NewSMTPSender()
+	// notificationRepository := notification_infra.NewPostgresRepository(db)
+	var notificationRepository notification_app.EmailSendRepository
+	smtpSender, err := notification_infra.NewSMTPSender(cfg)
 	if err != nil {
 		log.Fatalf("Error creating SMTP sender: %v", err)
 	}
@@ -99,36 +87,33 @@ func main() {
 			return
 		}
 		log.Printf("Processing user deletion request for UserID: %s", event.UserID)
-		handleUserDeletionEvent(context.Background(), db, rc, emailSender, event.UserID)
-	})
-	if err != nil {
-		log.Fatalf("Failed to subscribe to %s: %v", subjectUserDelete, err)
-	}
-
-	log.Printf("Subscribed to NATS subject: %s", subjectUserDelete)
-
-	// Start the periodic deletion checker
-	go startDeletionChecker(context.Background(), db, rc, emailSender)
-
-	log.Println("User deletion worker started")
-
-	// Keep the worker running
-	select {}
-}
-
-func handleUserDeletionEvent(ctx context.Context, db *infrastructure.DB, rc *redis.Client, emailSender *notification_app.EmailSender, userID string) {
-	log.Printf("User deletion event received for UserID: %s", userID)
+					handleUserDeletionEvent(context.Background(), infra.Supabase, rc, emailSender, event.UserID)
+			})
+			if err != nil {
+				log.Fatalf("Failed to subscribe to %s: %v", subjectUserDelete, err)
+			}
+		
+			log.Printf("Subscribed to NATS subject: %s", subjectUserDelete)
+		
+			// Start the periodic deletion checker
+			go startDeletionChecker(context.Background(), infra.Supabase, rc, emailSender)
+		
+			log.Println("User deletion worker started")
+		
+			// Keep the worker running
+			select {}
+		}
+		
+		func handleUserDeletionEvent(ctx context.Context, supabaseClient *supabase.Client, rc *redis.Client, emailSender *notification_app.EmailSender, userID string) {	log.Printf("User deletion event received for UserID: %s", userID)
 
 	// Insert into user_deletions table
 	scheduledDate := time.Now().Add(24 * time.Hour) // Schedule deletion 24 hours from now
-	_, err := db.Pool.Exec(ctx, `
-		INSERT INTO user_deletions (user_id, scheduled_date, status, created_at) 
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (user_id) DO UPDATE SET 
-			scheduled_date = EXCLUDED.scheduled_date,
-			status = EXCLUDED.status,
-			created_at = EXCLUDED.created_at
-	`, userID, scheduledDate, "queued", time.Now())
+	_, err := supabaseClient.DB.From("user_deletions").Insert(map[string]interface{}{
+		"user_id": userID,
+		"scheduled_date": scheduledDate,
+		"status": "queued",
+		"created_at": time.Now(),
+	}).Execute(ctx)
 	
 	if err != nil {
 		log.Printf("Error inserting user deletion record for UserID %s: %v", userID, err)
@@ -136,9 +121,9 @@ func handleUserDeletionEvent(ctx context.Context, db *infrastructure.DB, rc *red
 	}
 
 	log.Printf("User deletion scheduled for UserID: %s at %s", userID, scheduledDate.Format(time.RFC3339))
-}
+}}
 
-func startDeletionChecker(ctx context.Context, db *infrastructure.DB, rc *redis.Client, emailSender *notification_app.EmailSender) {
+func startDeletionChecker(ctx context.Context, supabaseClient *supabase.Client, rc *redis.Client, emailSender *notification_app.EmailSender) {
 	ticker := time.NewTicker(1 * time.Hour) // Check every hour
 	defer ticker.Stop()
 
@@ -148,34 +133,31 @@ func startDeletionChecker(ctx context.Context, db *infrastructure.DB, rc *redis.
 			return
 		case <-ticker.C:
 			log.Println("Scanning user_deletions table for pending actions...")
-			checkAndDeleteUsers(ctx, db, rc, emailSender)
+			checkAndDeleteUsers(ctx, supabaseClient, rc, emailSender)
 		}
 	}
 }
 
-func checkAndDeleteUsers(ctx context.Context, db *infrastructure.DB, rc *redis.Client, emailSender *notification_app.EmailSender) {
+func checkAndDeleteUsers(ctx context.Context, supabaseClient *supabase.Client, rc *redis.Client, emailSender *notification_app.EmailSender) {
 	// Query user_deletions table for pending deletions
-	rows, err := db.Pool.Query(ctx, `
-		SELECT id, user_id, scheduled_date, status 
-		FROM user_deletions 
-		WHERE status IN ('queued', 'scheduled') 
-		AND scheduled_date <= $1
-	`, time.Now().Add(deletionWarningPeriod))
+	var userDeletions []struct {
+		ID           string    `json:"id"`
+		UserID       string    `json:"user_id"`
+		ScheduledDate time.Time `json:"scheduled_date"`
+		Status       string    `json:"status"`
+	}
+
+	err := supabaseClient.DB.From("user_deletions").Select("id, user_id, scheduled_date, status").In("status", []string{"queued", "scheduled"}).Lte("scheduled_date", time.Now().Add(deletionWarningPeriod)).Execute(ctx, &userDeletions)
 	
 	if err != nil {
 		log.Printf("Error querying user_deletions table: %v", err)
 		return
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var id, userID string
-		var scheduledDate time.Time
-		var status string
-		if err := rows.Scan(&id, &userID, &scheduledDate, &status); err != nil {
-			log.Printf("Error scanning user_deletions row: %v", err)
-			continue
-		}
+	for _, deletion := range userDeletions {
+		var id, userID string = deletion.ID, deletion.UserID
+		var scheduledDate time.Time = deletion.ScheduledDate
+		var status string = deletion.Status
 
 		now := time.Now()
 		
@@ -198,11 +180,11 @@ func checkAndDeleteUsers(ctx context.Context, db *infrastructure.DB, rc *redis.C
 			}
 			
 			// Update status to scheduled
-			_, err = db.Pool.Exec(ctx, "UPDATE user_deletions SET status = $1 WHERE id = $2", "scheduled", id)
+			_, err = supabaseClient.DB.From("user_deletions").Update(map[string]interface{}{"status": "scheduled"}).Eq("id", id).Execute(ctx)
 			if err != nil {
 				log.Printf("Error updating user_deletions status for UserID %s: %v", userID, err)
 			}
-			_ = incrementUserEmailCount(ctx, rc, userID)
+			_ = incrementUserEmailCount(ctx, rc)
 			
 		} else if status == "scheduled" && now.After(scheduledDate) {
 			// Execute deletion if scheduled time has passed
@@ -214,14 +196,14 @@ func checkAndDeleteUsers(ctx context.Context, db *infrastructure.DB, rc *redis.C
 			log.Printf("Executing deletion for UserID: %s. Scheduled for: %s", userID, scheduledDate.Format(time.RFC3339))
 			
 			// Execute soft delete
-			err := executeUserDeletion(ctx, db, userID)
+			err := executeUserDeletion(ctx, supabaseClient, userID)
 			if err != nil {
 				log.Printf("Error executing deletion for UserID %s: %v", userID, err)
 				continue
 			}
 			
 			// Update status to executed
-			_, err = db.Pool.Exec(ctx, "UPDATE user_deletions SET status = $1, executed = $2 WHERE id = $3", "executed", true, id)
+			_, err = supabaseClient.DB.From("user_deletions").Update(map[string]interface{}{"status": "executed", "executed": true}).Eq("id", id).Execute(ctx)
 			if err != nil {
 				log.Printf("Error updating user_deletions status for UserID %s: %v", userID, err)
 			}
@@ -229,10 +211,15 @@ func checkAndDeleteUsers(ctx context.Context, db *infrastructure.DB, rc *redis.C
 		}
 	}
 
-	if err := rows.Err(); err != nil {
-		log.Printf("Error iterating user_deletions rows: %v", err)
-	}
-}
+	// No need for rows.Err() with Supabase client
+	// if err := rows.Err(); err != nil {
+	// 	log.Printf("Error iterating user_deletions rows: %v", err)
+	// }
+
+
+// executeUserDeletion performs the actual user deletion (soft delete)
+func executeUserDeletion(ctx context.Context, supabaseClient *supabase.Client, userID string) error {
+
 
 // checkGlobalDeletionRateLimit checks if the global deletion rate limit has been exceeded.
 func checkGlobalDeletionRateLimit(ctx context.Context, rc *redis.Client) bool {
@@ -288,32 +275,26 @@ func incrementUserEmailCount(ctx context.Context, rc *redis.Client, userID strin
 
 // executeUserDeletion performs the actual user deletion (soft delete)
 func executeUserDeletion(ctx context.Context, db *infrastructure.DB, userID string) error {
-	// Start a transaction
-	tx, err := db.Pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
 	// Soft delete the user
-	_, err = tx.Exec(ctx, `
-		UPDATE users 
-		SET is_deleted = true, deleted_at = $1, deletion_due_at = $1
-		WHERE id = $2 AND is_deleted = false
-	`, time.Now(), userID)
+	_, err := supabaseClient.DB.From("users").Update(map[string]interface{}{
+		"is_deleted": true,
+		"deleted_at": time.Now(),
+		"deletion_due_at": time.Now(),
+	}).Eq("id", userID).Eq("is_deleted", false).Execute(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Log the deletion action
-	_, err = tx.Exec(ctx, `
-		INSERT INTO action_logs (user_id, action, meta, created_at)
-		VALUES ($1, $2, $3, $4)
-	`, userID, "user_deleted", `{"deleted_by": "system", "reason": "scheduled_deletion"}`, time.Now())
+	_, err = supabaseClient.DB.From("action_logs").Insert(map[string]interface{}{
+		"user_id": userID,
+		"action": "user_deleted",
+		"meta":    `{"deleted_by": "system", "reason": "scheduled_deletion"}`,
+		"created_at": time.Now(),
+	}).Execute(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Commit the transaction
-	return tx.Commit(ctx)
+	return nil
 }

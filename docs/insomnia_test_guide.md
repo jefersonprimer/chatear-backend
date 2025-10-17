@@ -19,13 +19,13 @@ cp env.example .env
 
 ### 1.2. Start Docker Services
 
-Navigate to the root of your project and start the Docker services (Postgres, Redis, NATS):
+Navigate to the root of your project and start the Docker services (Redis, NATS):
 
 ```bash
 docker-compose -f docker-compose.events.yml up -d
 ```
 
-This will start the `postgres`, `redis`, and `nats` containers in detached mode.
+This will start the `redis`, and `nats` containers in detached mode.
 
 ### 1.3. Run the Go Application
 

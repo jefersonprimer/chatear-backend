@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jefersonprimer/chatear-backend/internal/user/domain"
 	"github.com/jefersonprimer/chatear-backend/shared/constants"
 )
@@ -20,18 +21,21 @@ type Claims struct {
 
 type TokenService struct {
 	refreshTokenRepo domain.RefreshTokenRepository
+	jwtSecret        []byte
 }
 
 // NewTokenService creates a new TokenService
-func NewTokenService(refreshTokenRepo domain.RefreshTokenRepository) *TokenService {
-	return &TokenService{refreshTokenRepo: refreshTokenRepo}
+func NewTokenService(refreshTokenRepo domain.RefreshTokenRepository, jwtSecret string) *TokenService {
+	return &TokenService{
+		refreshTokenRepo: refreshTokenRepo,
+		jwtSecret:        []byte(jwtSecret),
+	}
 }
 
-// GenerateAccessToken creates a new JWT access token
-func (s *TokenService) GenerateAccessToken(userID string) (string, error) {
+func (s *TokenService) CreateAccessToken(ctx context.Context, user *domain.User) (string, error) {
 	expirationTime := time.Now().Add(constants.AccessTokenExpiration)
 	claims := &Claims{
-		UserID: userID,
+		UserID: user.ID.String(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -39,36 +43,39 @@ func (s *TokenService) GenerateAccessToken(userID string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(constants.JwtSecret)
+	tokenString, err := token.SignedString(s.jwtSecret)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 	return tokenString, nil
 }
 
-// ValidateAccessToken validates the JWT access token and returns the claims
-func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) {
+func (s *TokenService) VerifyToken(ctx context.Context, tokenString string) (uuid.UUID, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return constants.JwtSecret, nil
+		return s.jwtSecret, nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse access token: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to parse access token: %w", err)
 	}
 
 	if !token.Valid {
-		return nil, fmt.Errorf("invalid access token")
+		return uuid.Nil, fmt.Errorf("invalid access token")
 	}
 
-	return claims, nil
+	userID, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid user ID in token: %w", err)
+	}
+
+	return userID, nil
 }
 
-// GenerateRefreshToken creates a new refresh token (UUID for now, will be stored in DB)
-func (s *TokenService) GenerateRefreshToken() (string, error) {
+func (s *TokenService) CreateRefreshToken(ctx context.Context, user *domain.User) (string, error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -79,7 +86,7 @@ func (s *TokenService) GenerateRefreshToken() (string, error) {
 
 // ValidateRefreshToken validates a refresh token (this will involve DB lookup later)
 func (s *TokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*domain.RefreshToken, error) {
-	refreshToken, err := s.refreshTokenRepo.FindByToken(tokenString)
+	refreshToken, err := s.refreshTokenRepo.GetRefreshTokenByToken(ctx, tokenString)
 	if err != nil {
 		return nil, fmt.Errorf("refresh token not found or invalid: %w", err)
 	}
