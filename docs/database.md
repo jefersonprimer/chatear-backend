@@ -10,6 +10,7 @@ CREATE TABLE public.action_logs (
   CONSTRAINT action_logs_pkey PRIMARY KEY (id),
   CONSTRAINT action_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.deletion_capacity (
   day date NOT NULL,
   count integer NOT NULL DEFAULT 0,
@@ -17,6 +18,7 @@ CREATE TABLE public.deletion_capacity (
   updated_at timestamp without time zone DEFAULT now(),
   CONSTRAINT deletion_capacity_pkey PRIMARY KEY (day)
 );
+
 CREATE TABLE public.email_sends (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -25,6 +27,7 @@ CREATE TABLE public.email_sends (
   CONSTRAINT email_sends_pkey PRIMARY KEY (id),
   CONSTRAINT email_sends_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.magic_links (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -38,6 +41,7 @@ CREATE TABLE public.magic_links (
   CONSTRAINT magic_links_pkey PRIMARY KEY (id),
   CONSTRAINT magic_links_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.notifications (
   id uuid NOT NULL,
   type character varying NOT NULL,
@@ -48,6 +52,7 @@ CREATE TABLE public.notifications (
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT notifications_pkey PRIMARY KEY (id)
 );
+
 CREATE TABLE public.refresh_tokens (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -60,6 +65,7 @@ CREATE TABLE public.refresh_tokens (
   CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id),
   CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.user_deletion_cycles (
   user_id uuid NOT NULL,
   cycles integer NOT NULL DEFAULT 0,
@@ -67,6 +73,7 @@ CREATE TABLE public.user_deletion_cycles (
   CONSTRAINT user_deletion_cycles_pkey PRIMARY KEY (user_id),
   CONSTRAINT user_deletion_cycles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.user_deletions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -81,6 +88,7 @@ CREATE TABLE public.user_deletions (
   CONSTRAINT user_deletions_pkey PRIMARY KEY (id),
   CONSTRAINT user_deletions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.user_logins (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -91,6 +99,7 @@ CREATE TABLE public.user_logins (
   CONSTRAINT user_logins_pkey PRIMARY KEY (id),
   CONSTRAINT user_logins_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,

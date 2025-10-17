@@ -13,8 +13,7 @@ services:
       - REDIS_ADDR=redis:6379
       - NATS_URL=nats://nats:4222
       # Adicione suas variáveis de conexão Supabase (via .env)
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_CONNECTION_STRING=${SUPABASE_CONNECTION_STRING}
     networks:
       - cheater-backend-network
 
