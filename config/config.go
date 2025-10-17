@@ -39,26 +39,27 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		AppURL:                  getEnv("APP_URL"),
-		Port:                    getEnvAsInt("PORT"),
-		SupabaseConnectionString:             getEnv("SUPABASE_CONNECTION_STRING", ""),
-		RedisURL:                getEnv("REDIS_URL"),
-		NatsURL:                 getEnv("NATS_URL""),
-		JwtSecret:               getEnv("JWT_SECRET"),
-		AccessTokenTTL:          getEnvAsDuration("ACCESS_TOKEN_TTL"),
-		RefreshTokenTTL:         getEnvAsDuration("REFRESH_TOKEN_TTL"),
-		SMTPHost:                getEnv("SMTP_HOST"),
-		SMTPPort:                getEnvAsInt("SMTP_PORT"),
-		SMTPUser:                getEnv("SMTP_USER"),
-		SMTPPass:                getEnv("SMTP_PASS"),
-		SMTPFrom:                getEnv("SMTP_FROM"),
-		MagicLinkExpiry:         getEnvAsDuration("MAGIC_LINK_EXPIRY"),
-		RateLimitEnabled:        getEnvAsBool("RATE_LIMIT_ENABLED"),
-		KeyRotationInterval:     getEnvAsDuration("KEY_ROTATION_INTERVAL"),
-		MaxEmailsPerDay:         getEnvAsInt("MAX_EMAILS_PER_DAY"),
-		HardDeleteRetentionPeriod: getEnvAsDuration("HARD_DELETE_RETENTION_PERIOD"),
+		AppURL:                    getEnv("APP_URL", ""),
+		Port:                      getEnvAsInt("PORT", 8080),
+		SupabaseConnectionString:  getEnv("SUPABASE_CONNECTION_STRING", ""),
+		RedisURL:                  getEnv("REDIS_URL", ""),
+		NatsURL:                   getEnv("NATS_URL", ""),
+		JwtSecret:                 getEnv("JWT_SECRET", ""),
+		AccessTokenTTL:            getEnvAsDuration("ACCESS_TOKEN_TTL", time.Hour),
+		RefreshTokenTTL:           getEnvAsDuration("REFRESH_TOKEN_TTL", 24*time.Hour),
+		SMTPHost:                  getEnv("SMTP_HOST", ""),
+		SMTPPort:                  getEnvAsInt("SMTP_PORT", 587),
+		SMTPUser:                  getEnv("SMTP_USER", ""),
+		SMTPPass:                  getEnv("SMTP_PASS", ""),
+		SMTPFrom:                  getEnv("SMTP_FROM", ""),
+		MagicLinkExpiry:           getEnvAsDuration("MAGIC_LINK_EXPIRY", time.Hour),
+		RateLimitEnabled:          getEnvAsBool("RATE_LIMIT_ENABLED", false),
+		KeyRotationInterval:       getEnvAsDuration("KEY_ROTATION_INTERVAL", 24*time.Hour),
+		MaxEmailsPerDay:           getEnvAsInt("MAX_EMAILS_PER_DAY", 100),
+		HardDeleteRetentionPeriod: getEnvAsDuration("HARD_DELETE_RETENTION_PERIOD", 60*24*time.Hour),
 	}
 }
+
 
 // Helper functions to get environment variables
 

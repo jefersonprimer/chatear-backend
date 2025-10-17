@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log"
 	"time"
-
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/go-redis/redis/v8"
 	"github.com/nats-io/nats.go"
-	"github.com/supabase-community/supabase-go/supabase"
 )
 
 
